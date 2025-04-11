@@ -1,0 +1,527 @@
+/* AR Blender Model Viewer Styles */
+
+/* Global Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* A-Frame Scene Canvas - Prevent white screen issues */
+.a-canvas, canvas.a-canvas {
+    position: absolute !important;
+    width: 100% !important;
+    height: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 1 !important;
+}
+
+/* Fix for white screen issue */
+a-scene {
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+/* Make sure all AR elements are properly contained */
+.a-enter-vr, .a-enter-ar {
+    right: 10px !important;
+}
+
+/* Loading Screen */
+#loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.loading-container {
+    text-align: center;
+    color: white;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+    margin: 0 auto 20px;
+}
+
+.loading-text {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+/* Control Panel */
+#control-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    z-index: 10;
+    transition: transform 0.3s ease-in-out;
+    flex-wrap: wrap;
+    max-width: 350px;
+    padding: 0 10px;
+}
+
+.control-button {
+    width: 60px;
+    height: 60px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.control-button img {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 2px;
+}
+
+.control-button span {
+    font-size: 10px;
+}
+
+.control-button.active {
+    background-color: #3498db;
+    color: white;
+}
+
+.control-button:active {
+    transform: scale(0.95);
+}
+
+/* Viewport Controls */
+#viewport-controls {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10;
+}
+
+.viewport-control-button {
+    width: 45px;
+    height: 45px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.viewport-control-button img {
+    width: 20px;
+    height: 20px;
+}
+
+.viewport-control-button:active {
+    transform: scale(0.95);
+}
+
+/* Placement Indicator */
+#placement-indicator {
+    position: fixed;
+    top: 50%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    transform: translateY(-50%);
+    z-index: 5;
+    pointer-events: none;
+}
+
+.placement-text {
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    display: inline-block;
+    font-size: 16px;
+    animation: pulse 2s infinite;
+}
+
+/* Status Indicator */
+.status-indicator {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    z-index: 10;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #f39c12;
+    margin-right: 8px;
+    animation: blink 1.5s infinite;
+}
+
+.status-dot.connected {
+    background-color: #2ecc71;
+    animation: none;
+}
+
+.status-text {
+    font-size: 14px;
+}
+
+/* Help Button and Modal */
+.action-button {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    z-index: 10;
+}
+
+.action-button img {
+    width: 24px;
+    height: 24px;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.modal-content {
+    background-color: white;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    background-color: #3498db;
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.close-button {
+    font-size: 24px;
+    cursor: pointer;
+    color: white;
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.modal-body ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.modal-body li {
+    margin-bottom: 12px;
+    display: flex;
+    align-items: flex-start;
+}
+
+.modal-body li:before {
+    content: "•";
+    color: #3498db;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+/* Model Selection Modal */
+#model-selection-modal {
+    z-index: 1000;
+}
+
+.model-selection-options {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.model-option {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.model-option-header {
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 16px;
+}
+
+.model-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 15px;
+}
+
+.model-preset {
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.2s;
+}
+
+.model-preset:hover {
+    transform: scale(1.05);
+}
+
+.model-preset.selected {
+    outline: 2px solid #3498db;
+    border-radius: 8px;
+}
+
+.model-thumbnail {
+    width: 100%;
+    height: 100px;
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.model-thumbnail.default-model {
+    background-image: url('../img/default-model.png');
+}
+
+.model-name {
+    font-size: 12px;
+    color: #555;
+}
+
+.upload-zone {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+
+.upload-zone:hover {
+    border-color: #3498db;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.upload-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.upload-button img {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 10px;
+    opacity: 0.7;
+}
+
+.upload-button span {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Error Messages */
+#error-message {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.error-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    max-width: 80%;
+}
+
+.error-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #e74c3c;
+}
+
+.error-description {
+    margin-bottom: 20px;
+    color: #555;
+}
+
+.primary-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.primary-button:hover {
+    background-color: #2980b9;
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+/* Notification System */
+.notification {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    pointer-events: none;
+    text-align: center;
+    max-width: 80%;
+}
+
+.notification.show {
+    opacity: 1;
+}
+
+/* Animations */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+@keyframes blink {
+    0% { opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { opacity: 0.4; }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    #control-panel {
+        max-width: 280px;
+    }
+    
+    .control-button {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .viewport-control-button {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* Fix for A-Frame specific issues */
+.a-fullscreen .a-canvas {
+    width: 100vw !important;
+    height: 100vh !important;
+}

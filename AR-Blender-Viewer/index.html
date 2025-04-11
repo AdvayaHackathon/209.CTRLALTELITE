@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AR Blender Model Viewer</title>
+    <meta name="description" content="View your Blender 3D models in Augmented Reality">
+    <meta name="theme-color" content="#3498db">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/aframevr/aframe/master/examples/boilerplate/favicon.png">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="./css/styles.css">
+    
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- A-Frame and AR.js -->
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script src="./js/ar-components.js"></script>
+    <script src="./js/ui-manager.js"></script>
+    <script src="./js/main.js"></script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading AR Experience...</div>
+        </div>
+    </div>
+    
+    <!-- Model Selection Modal -->
+    <div id="model-selection-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Select 3D Model</h2>
+                <span class="close-button" id="close-model-selection">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="model-selection-options">
+                    <div class="model-option">
+                        <div class="model-option-header">Choose from Examples</div>
+                        <div class="model-preset-grid" id="model-preset-grid">
+                            <!-- Preset models will be populated by JavaScript -->
+                            <div class="model-preset" data-model="./models/model.glb">
+                                <div class="model-thumbnail default-model"></div>
+                                <div class="model-name">Default Model</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="model-option">
+                        <div class="model-option-header">Upload Your Own</div>
+                        <div class="upload-zone">
+                            <input type="file" id="model-upload" accept=".glb,.gltf">
+                            <label for="model-upload" class="upload-button">
+                                <i class="fas fa-upload"></i>
+                                <span>Upload GLB/GLTF Model</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Control Panel -->
+    <div id="control-panel" class="hidden">
+        <div class="control-button" id="place-button">
+            <i class="fas fa-hand-pointer"></i>
+            <span>Place</span>
+        </div>
+        <div class="control-button" id="rotate-button">
+            <i class="fas fa-sync-alt"></i>
+            <span>Rotate</span>
+        </div>
+        <div class="control-button" id="scale-button">
+            <i class="fas fa-expand-arrows-alt"></i>
+            <span>Scale</span>
+        </div>
+        <div class="control-button" id="pan-button">
+            <i class="fas fa-arrows-alt"></i>
+            <span>Pan</span>
+        </div>
+        <div class="control-button" id="view360-button" class="active">
+            <i class="fas fa-street-view"></i>
+            <span>360° View</span>
+        </div>
+        <div class="control-button" id="reset-button">
+            <i class="fas fa-undo"></i>
+            <span>Reset</span>
+        </div>
+        <div class="control-button" id="model-button">
+            <i class="fas fa-cube"></i>
+            <span>Change Model</span>
+        </div>
+    </div>
+    
+    <!-- Placement Indicator -->
+    <div id="placement-indicator" class="hidden">
+        <div class="placement-text">Tap to place model</div>
+    </div>
+    
+    <!-- AR Scene -->
+    <a-scene
+        ar-scene-manager
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: true"
+        renderer="antialias: true; alpha: true; precision: medium; logarithmicDepthBuffer: true;"
+        embedded>
+        
+        <!-- Assets -->
+        <a-assets id="a-assets">
+            <a-asset-item id="model-asset" src="./models/model.glb"></a-asset-item>
+            <img id="shadow-img" src="https://cdn.glitch.global/3dee4cf9-9c12-4436-8e41-c294b4b9227f/shadow.png">
+        </a-assets>
+        
+        <!-- Camera -->
+        <a-entity 
+            id="camera" 
+            camera 
+            position="0 1.6 0" 
+            device-orientation-controls
+            look-controls="magicWindowTrackingEnabled: true; reverseMouseDrag: false;">
+            
+            <!-- Cursor for interaction -->
+            <a-entity 
+                id="cursor" 
+                cursor="fuse: false; rayOrigin: mouse;" 
+                raycaster="far: 100; objects: .clickable"
+                position="0 0 -1"
+                geometry="primitive: ring; radiusInner: 0.025; radiusOuter: 0.03"
+                material="color: white; shader: flat"
+                visible="false">
+            </a-entity>
+        </a-entity>
+        
+        <!-- Scene content -->
+        <a-entity id="scene-content">
+            <!-- Ground plane for hit testing -->
+            <a-plane
+                id="ground"
+                position="0 0 0"
+                rotation="-90 0 0"
+                width="100"
+                height="100"
+                color="#ffffff"
+                opacity="0.0"
+                class="clickable">
+            </a-plane>
+            
+            <!-- Model entity -->
+            <a-entity
+                id="model-container"
+                position="0 0 -3"
+                rotation="0 0 0"
+                scale="1 1 1"
+                visible="true"
+                model-controls>
+                
+                <!-- Shadow -->
+                <a-image
+                    id="model-shadow"
+                    src="#shadow-img"
+                    rotation="-90 0 0"
+                    position="0 -0.01 0"
+                    width="1"
+                    height="1"
+                    opacity="0.5">
+                </a-image>
+                
+                <!-- Actual model -->
+                <a-entity
+                    id="model"
+                    gltf-model="#model-asset"
+                    position="0 0 0"
+                    rotation="0 0 0"
+                    scale="1 1 1">
+                </a-entity>
+            </a-entity>
+        </a-entity>
+    </a-scene>
+    
+    <!-- Viewport Controls -->
+    <div id="viewport-controls">
+        <div class="viewport-control-button" id="zoom-in-button">
+            <i class="fas fa-search-plus"></i>
+        </div>
+        <div class="viewport-control-button" id="zoom-out-button">
+            <i class="fas fa-search-minus"></i>
+        </div>
+        <div class="viewport-control-button" id="center-view-button">
+            <i class="fas fa-crosshairs"></i>
+        </div>
+    </div>
+    
+    <!-- AR Status Indicator -->
+    <div id="ar-status" class="status-indicator">
+        <div class="status-dot"></div>
+        <div class="status-text">Initializing AR...</div>
+    </div>
+    
+    <!-- Help Panel -->
+    <div id="help-button" class="action-button">
+        <i class="fas fa-question"></i>
+    </div>
+    
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>AR Controls</h2>
+                <span class="close-button">&times;</span>
+            </div>
+            <div class="modal-body">
+                <ul>
+                    <li><strong>Place:</strong> Tap on the ground to place model</li>
+                    <li><strong>Rotate:</strong> Drag with one finger to rotate model</li>
+                    <li><strong>Scale:</strong> Pinch with two fingers to resize</li>
+                    <li><strong>Pan:</strong> Drag with two fingers to move model</li>
+                    <li><strong>360° View:</strong> Move your device to see all angles</li>
+                    <li><strong>Zoom:</strong> Use zoom buttons or pinch to zoom viewport</li>
+                    <li><strong>Change Model:</strong> Select a different 3D model</li>
+                    <li><strong>Reset:</strong> Return model to original position and size</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Error Message -->
+    <div id="error-message" class="hidden">
+        <div class="error-content">
+            <div class="error-title">Something went wrong</div>
+            <div class="error-description">Please check your device compatibility and try again.</div>
+            <button id="reload-button" class="primary-button">Reload</button>
+        </div>
+    </div>
+
+    <!-- Permissions Request -->
+    <div id="permissions-request" class="hidden">
+        <div class="permissions-content">
+            <div class="permissions-title">Enable Device Motion</div>
+            <div class="permissions-description">This app needs access to your device's motion sensors for 360° view.</div>
+            <button id="enable-motion-button" class="primary-button">Enable 360° View</button>
+        </div>
+    </div>
+</body>
+</html>

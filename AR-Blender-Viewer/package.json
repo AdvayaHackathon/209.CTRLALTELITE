@@ -1,0 +1,19 @@
+{
+  "name": "ar-blender-viewer",
+  "version": "1.0.0",
+  "description": "A complete web-based Augmented Reality application for displaying 3D models exported from Blender. This application allows users to place, move, rotate, and scale 3D models in their real environment using their mobile device's camera.",
+  "main": "service-worker.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "fs": "^0.0.1-security",
+    "https": "^1.0.0",
+    "path": "^0.12.7"
+  }
+}
