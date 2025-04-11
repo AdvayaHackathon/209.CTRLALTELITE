@@ -8,7 +8,7 @@ const ARApp = {
     // DOM Elements
     loadingScreen: null,
     modelButton: null,
-    controlButtons: null,
+    controlButtons: [],
     modelSelectionModal: null,
     viewportSettings: {
         zoomLevel: 1.0,
@@ -19,6 +19,13 @@ const ARApp = {
     orientation360Enabled: false,
     isInitialized: false,
     
+    // Available models for selection
+    availableModels: [
+        { name: 'Default Model', path: './models/model.glb', thumbnail: 'default-model' },
+        { name: 'Cube', path: './models/cube.glb', thumbnail: 'default-model' },
+        { name: 'Robot', path: './models/robot.glb', thumbnail: 'default-model' }
+    ],
+    
     // Initialize the application
     init: function() {
         console.log('AR Blender Viewer initializing...');
@@ -27,22 +34,29 @@ const ARApp = {
             if (this.isInitialized) return;
             this.isInitialized = true;
             
-            // Get DOM Elements
+            // Initialize UI Manager first to ensure it's ready
+            UIManager.init();
+            
+            // Get DOM Elements - with error handling
             this.loadingScreen = document.getElementById('loading-screen');
             this.modelButton = document.getElementById('model-button');
-            this.controlButtons = document.querySelectorAll('.control-button');
+            
+            // Safely get control buttons with error handling
+            const controlButtonElements = document.querySelectorAll('.control-button');
+            this.controlButtons = controlButtonElements ? Array.from(controlButtonElements) : [];
+            
             this.modelSelectionModal = document.getElementById('model-selection-modal');
             this.permissionsRequest = document.getElementById('permissions-request');
             this.enableMotionButton = document.getElementById('enable-motion-button');
             this.view360Button = document.getElementById('view360-button');
             
+            // Log debug info
+            console.log('Control buttons found:', this.controlButtons.length);
+            
             // Check if elements exist
             if (!this.loadingScreen) console.error('Loading screen element not found');
             if (!this.modelButton) console.error('Model button element not found');
             if (!this.modelSelectionModal) console.error('Model selection modal element not found');
-            
-            // Initialize UI Manager
-            UIManager.init();
             
             // Setup Event Listeners
             this.setupEventListeners();
@@ -88,8 +102,16 @@ const ARApp = {
     // Setup Event Listeners
     setupEventListeners: function() {
         try {
+            // Safety check before using forEach
+            if (!this.controlButtons || this.controlButtons.length === 0) {
+                console.warn('No control buttons found to set up event listeners');
+                return;
+            }
+            
             // Control Button Click Events
             this.controlButtons.forEach(button => {
+                if (!button) return; // Skip if button is null
+                
                 button.addEventListener('click', () => {
                     const buttonId = button.id;
                     
@@ -101,26 +123,43 @@ const ARApp = {
                     // Handle button actions
                     switch(buttonId) {
                         case 'place-button':
-                            UIManager.showPlacementIndicator();
-                            UIManager.setInteractionMode('place');
+                            if (UIManager.showPlacementIndicator) {
+                                UIManager.showPlacementIndicator();
+                            }
+                            if (UIManager.setControlModeActive) {
+                                UIManager.setControlModeActive('place');
+                            }
                             break;
                         case 'rotate-button':
-                            UIManager.setInteractionMode('rotate');
+                            if (UIManager.setControlModeActive) {
+                                UIManager.setControlModeActive('rotate');
+                            }
                             break;
                         case 'scale-button':
-                            UIManager.setInteractionMode('scale');
+                            if (UIManager.setControlModeActive) {
+                                UIManager.setControlModeActive('scale');
+                            }
                             break;
                         case 'pan-button':
-                            UIManager.setInteractionMode('pan');
+                            if (UIManager.setControlModeActive) {
+                                UIManager.setControlModeActive('pan');
+                            }
                             break;
                         case 'view360-button':
                             this.toggle360View();
                             break;
                         case 'reset-button':
-                            UIManager.resetModel();
+                            // Call UIManager reset if it exists
+                            if (UIManager.resetModel) {
+                                UIManager.resetModel();
+                            } else {
+                                this.resetModel(); // Fallback to local method
+                            }
                             break;
                         case 'model-button':
-                            UIManager.showModelSelectionModal();
+                            if (UIManager.showModelSelectionModal) {
+                                UIManager.showModelSelectionModal();
+                            }
                             break;
                     }
                 });
@@ -141,7 +180,9 @@ const ARApp = {
                 
                 scene.addEventListener('loaded', () => {
                     console.log('A-Frame scene loaded');
-                    UIManager.showNotification('AR Scene loaded successfully');
+                    if (UIManager.showNotification) {
+                        UIManager.showNotification('AR Scene loaded successfully');
+                    }
                 });
                 
                 scene.addEventListener('error', (error) => {
@@ -151,8 +192,11 @@ const ARApp = {
             } else {
                 console.error('A-Frame scene not found');
             }
+            
+            console.log('Event listeners setup complete');
         } catch (error) {
             console.error('Error setting up event listeners:', error);
+            this.showError('Failed to setup controls. ' + error.message);
         }
     },
     
@@ -303,34 +347,54 @@ const ARApp = {
     
     // Populate the model grid with available models
     populateModelGrid: function() {
-        if (!this.modelPresetGrid) return;
-        
-        // Clear existing content
-        this.modelPresetGrid.innerHTML = '';
-        
-        // Add available models
-        this.availableModels.forEach(model => {
-            const modelElement = document.createElement('div');
-            modelElement.className = 'model-preset';
-            modelElement.dataset.model = model.path;
+        try {
+            // Safety check for model grid element
+            if (!this.modelPresetGrid) {
+                console.error('Model preset grid element not found');
+                return;
+            }
             
-            const thumbnailElement = document.createElement('div');
-            thumbnailElement.className = `model-thumbnail ${model.thumbnail}`;
+            // Safety check for available models
+            if (!this.availableModels || !Array.isArray(this.availableModels)) {
+                console.error('Available models not defined or not an array');
+                this.availableModels = [
+                    { name: 'Default Model', path: './models/model.glb', thumbnail: 'default-model' }
+                ];
+            }
             
-            const nameElement = document.createElement('div');
-            nameElement.className = 'model-name';
-            nameElement.textContent = model.name;
+            // Clear existing content
+            this.modelPresetGrid.innerHTML = '';
             
-            modelElement.appendChild(thumbnailElement);
-            modelElement.appendChild(nameElement);
+            console.log('Populating model grid with', this.availableModels.length, 'models');
             
-            // Add click event to select this model
-            modelElement.addEventListener('click', () => {
-                this.selectPresetModel(model.path);
+            // Add available models
+            this.availableModels.forEach(model => {
+                const modelElement = document.createElement('div');
+                modelElement.className = 'model-preset';
+                modelElement.dataset.model = model.path;
+                
+                const thumbnailElement = document.createElement('div');
+                thumbnailElement.className = `model-thumbnail ${model.thumbnail || 'default-model'}`;
+                
+                const nameElement = document.createElement('div');
+                nameElement.className = 'model-name';
+                nameElement.textContent = model.name;
+                
+                modelElement.appendChild(thumbnailElement);
+                modelElement.appendChild(nameElement);
+                
+                // Add click event to select this model
+                modelElement.addEventListener('click', () => {
+                    this.selectPresetModel(model.path);
+                });
+                
+                this.modelPresetGrid.appendChild(modelElement);
             });
             
-            this.modelPresetGrid.appendChild(modelElement);
-        });
+            console.log('Model grid populated successfully');
+        } catch (error) {
+            console.error('Error populating model grid:', error);
+        }
     },
     
     // Select a preset model

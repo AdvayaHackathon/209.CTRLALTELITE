@@ -109,6 +109,7 @@
     <!-- AR Scene -->
     <a-scene
         ar-scene-manager
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best; sourceWidth: 1280; sourceHeight: 960; displayWidth: 1280; displayHeight: 960;"
         vr-mode-ui="enabled: false"
         device-orientation-permission-ui="enabled: true"
         renderer="antialias: true; alpha: true; precision: medium; logarithmicDepthBuffer: true;"
@@ -117,13 +118,13 @@
         <!-- Assets -->
         <a-assets id="a-assets" timeout="30000">
             <a-asset-item id="model-asset" src="./models/model.glb" response-type="arraybuffer"></a-asset-item>
-            <img id="shadow-img" src="https://cdn.glitch.global/3dee4cf9-9c12-4436-8e41-c294b4b9227f/shadow.png" crossorigin="anonymous">
+            <img id="shadow-img" src="./images/shadow.png">
         </a-assets>
         
         <!-- Camera -->
         <a-entity 
             id="camera" 
-            camera 
+            camera
             position="0 1.6 0" 
             look-controls="magicWindowTrackingEnabled: true; reverseMouseDrag: false;">
             
@@ -204,6 +205,11 @@
         <div class="status-text">Initializing AR...</div>
     </div>
     
+    <!-- Camera Permission Button -->
+    <div id="camera-permission-button" class="action-button hidden">
+        <i class="fas fa-camera"></i>
+    </div>
+    
     <!-- Help Panel -->
     <div id="help-button" class="action-button">
         <i class="fas fa-question"></i>
@@ -243,9 +249,9 @@
     <!-- Permissions Request -->
     <div id="permissions-request" class="hidden">
         <div class="permissions-content">
-            <div class="permissions-title">Enable Device Motion</div>
-            <div class="permissions-description">This app needs access to your device's motion sensors for 360° view.</div>
-            <button id="enable-motion-button" class="primary-button">Enable 360° View</button>
+            <div class="permissions-title">Enable Device Motion & Camera</div>
+            <div class="permissions-description">This app needs access to your device's motion sensors and camera for AR functionality.</div>
+            <button id="enable-motion-button" class="primary-button">Enable Features</button>
         </div>
     </div>
     

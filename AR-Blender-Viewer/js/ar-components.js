@@ -855,17 +855,40 @@ AFRAME.registerComponent('ar-scene-manager', {
         // Setup scene
         this.setupScene();
         
+        // Initialize camera
+        this.initCamera();
+        
         console.log('AR Scene Manager initialized');
     },
     
     bindMethods: function() {
         this.onSceneLoaded = this.onSceneLoaded.bind(this);
         this.onSceneError = this.onSceneError.bind(this);
+        this.onCameraAccessGranted = this.onCameraAccessGranted.bind(this);
+        this.onCameraAccessDenied = this.onCameraAccessDenied.bind(this);
+        this.requestCameraPermission = this.requestCameraPermission.bind(this);
     },
     
     addEventListeners: function() {
         this.el.addEventListener('loaded', this.onSceneLoaded);
         this.el.addEventListener('error', this.onSceneError);
+        
+        // Listen for camera-related events
+        this.el.addEventListener('camera-init', (event) => {
+            console.log('Camera initialized:', event);
+            UIManager.showNotification('Camera initialized');
+        });
+        
+        this.el.addEventListener('camera-error', (event) => {
+            console.error('Camera error:', event);
+            UIManager.showError('Camera access error. Please check permissions and try again.');
+        });
+        
+        // Add camera permission button listener
+        const cameraButton = document.getElementById('camera-permission-button');
+        if (cameraButton) {
+            cameraButton.addEventListener('click', this.requestCameraPermission);
+        }
     },
     
     setupScene: function() {
@@ -880,15 +903,112 @@ AFRAME.registerComponent('ar-scene-manager', {
             
             if (AFRAME.utils.device.isMobile()) {
                 console.log('Mobile device detected. Enabling device orientation controls.');
-                this.camera.setAttribute('device-orientation-controls', '');
             }
         }
+    },
+    
+    initCamera: function() {
+        // Check if AR.js has already initialized the camera
+        if (this.el.getAttribute('arjs')) {
+            console.log('AR.js camera already initialized');
+            return;
+        }
+        
+        // Manually initialize camera if needed
+        this.requestCameraPermission();
+    },
+    
+    requestCameraPermission: function() {
+        console.log('Requesting camera permission...');
+        
+        // Show camera permission button
+        const cameraButton = document.getElementById('camera-permission-button');
+        if (cameraButton) {
+            cameraButton.classList.remove('hidden');
+        }
+        
+        // Request camera access
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(this.onCameraAccessGranted)
+                .catch(this.onCameraAccessDenied);
+        } else {
+            console.error('MediaDevices API not supported');
+            UIManager.showError('Your browser does not support camera access. Please try a different browser.');
+        }
+    },
+    
+    onCameraAccessGranted: function(stream) {
+        console.log('Camera access granted');
+        UIManager.showNotification('Camera access granted');
+        
+        // Hide camera permission button
+        const cameraButton = document.getElementById('camera-permission-button');
+        if (cameraButton) {
+            cameraButton.classList.add('hidden');
+        }
+        
+        // Create video element if it doesn't exist
+        let video = document.querySelector('#arjs-video');
+        if (!video) {
+            video = document.createElement('video');
+            video.id = 'arjs-video';
+            video.autoplay = true;
+            video.playsinline = true;
+            video.style.display = 'none';
+            document.body.appendChild(video);
+        }
+        
+        // Set up video stream
+        if ('srcObject' in video) {
+            video.srcObject = stream;
+        } else {
+            // Fallback for older browsers
+            video.src = window.URL.createObjectURL(stream);
+        }
+        
+        // Add arjs-video class to ensure AR.js uses this video
+        const sceneEl = document.querySelector('a-scene');
+        if (sceneEl && !sceneEl.classList.contains('arjs-video-loaded')) {
+            sceneEl.classList.add('arjs-video-loaded');
+            
+            // Force AR.js to use our video
+            const arToolkitContext = sceneEl.systems['arjs'] && sceneEl.systems['arjs'].arToolkitContext;
+            if (arToolkitContext) {
+                arToolkitContext.arController.videoWidth = video.videoWidth;
+                arToolkitContext.arController.videoHeight = video.videoHeight;
+            }
+        }
+        
+        // Set AR status
+        UIManager.setARStatus('Ready: Camera active');
+    },
+    
+    onCameraAccessDenied: function(error) {
+        console.error('Camera access denied:', error);
+        UIManager.showError('Camera access denied. Please allow camera access to use AR features.');
+        
+        // Show camera permission button
+        const cameraButton = document.getElementById('camera-permission-button');
+        if (cameraButton) {
+            cameraButton.classList.remove('hidden');
+        }
+        
+        // Set AR status
+        UIManager.setARStatus('Error: Camera access denied');
     },
     
     onSceneLoaded: function() {
         console.log('AR Scene loaded successfully');
         UIManager.setARStatus('Ready: AR Scene loaded');
         UIManager.showNotification('AR Scene loaded. Ready for interaction.');
+        
+        // Check if camera is working
+        const video = document.querySelector('#arjs-video');
+        if (!video || !video.srcObject) {
+            console.warn('Camera not initialized yet, requesting permission...');
+            this.requestCameraPermission();
+        }
     },
     
     onSceneError: function(event) {
@@ -903,11 +1023,23 @@ AFRAME.registerComponent('ar-scene-manager', {
     
     remove: function() {
         this.removeEventListeners();
+        
+        // Clean up camera resources
+        const video = document.querySelector('#arjs-video');
+        if (video && video.srcObject) {
+            const tracks = video.srcObject.getTracks();
+            tracks.forEach(track => track.stop());
+        }
     },
     
     removeEventListeners: function() {
         this.el.removeEventListener('loaded', this.onSceneLoaded);
         this.el.removeEventListener('error', this.onSceneError);
+        
+        const cameraButton = document.getElementById('camera-permission-button');
+        if (cameraButton) {
+            cameraButton.removeEventListener('click', this.requestCameraPermission);
+        }
     }
 });
 
