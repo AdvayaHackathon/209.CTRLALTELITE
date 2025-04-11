@@ -2,24 +2,48 @@
 
 /* Global Styles */
 * {
-    box-sizing: border-box;
     margin: 0;
     padding: 0;
+    box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
 }
 
-body {
-    font-family: 'Arial', sans-serif;
-    overflow: hidden;
-    position: fixed;
+body, html {
     width: 100%;
     height: 100%;
-    margin: 0;
-    padding: 0;
-    touch-action: none;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
+    font-family: Arial, sans-serif;
+    background-color: #000;
+    color: #fff;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Fix for A-Frame and white screen issues */
+.a-canvas {
+    position: absolute !important;
+    width: 100% !important;
+    height: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 1 !important;
+}
+
+a-scene {
+    position: absolute !important;
+    width: 100% !important;
+    height: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 1 !important;
+}
+
+.a-fullscreen {
+    width: 100% !important;
+    height: 100% !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
 }
 
 /* A-Frame Scene Canvas - Prevent white screen issues */

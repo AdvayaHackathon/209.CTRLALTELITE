@@ -21,18 +21,31 @@ const PORT = 5000;
 
 // Create a simple HTTPS server
 const server = https.createServer(options, (req, res) => {
-  // Set security headers
+  console.log(`Request: ${req.method} ${req.url}`);
+  
+  // Set security headers for AR
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range');
+  
+  // Specific headers for AR functionality
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  
+  // Handle OPTIONS requests (CORS preflight)
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
 
   // Get the request URL
-  const url = req.url === '/' ? '/index.html' : req.url;
+  let url = req.url === '/' ? '/index.html' : req.url;
+  
+  // Remove query parameters if present
+  url = url.split('?')[0];
+  
   const filePath = path.join(__dirname, url);
-  const extname = path.extname(filePath);
+  const extname = path.extname(filePath).toLowerCase();
 
   // Define content types for different file extensions
   const contentTypes = {
@@ -47,28 +60,56 @@ const server = https.createServer(options, (req, res) => {
     '.svg': 'image/svg+xml',
     '.ico': 'image/x-icon',
     '.glb': 'model/gltf-binary',
-    '.gltf': 'model/gltf+json'
+    '.gltf': 'model/gltf+json',
+    '.bin': 'application/octet-stream',
+    '.mp4': 'video/mp4',
+    '.webp': 'image/webp',
+    '.ttf': 'font/ttf',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.eot': 'application/vnd.ms-fontobject',
+    '.otf': 'font/otf'
   };
 
   const contentType = contentTypes[extname] || 'application/octet-stream';
 
-  // Read the file
-  fs.readFile(filePath, (error, content) => {
-    if (error) {
-      if (error.code === 'ENOENT') {
-        // File not found
-        res.writeHead(404);
-        res.end('File not found');
-      } else {
-        // Server error
-        res.writeHead(500);
-        res.end(`Server Error: ${error.code}`);
-      }
-    } else {
-      // Success
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(content, 'utf-8');
+  // Check if file exists
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.error(`File not found: ${filePath}`);
+      res.writeHead(404);
+      res.end(`File not found: ${url}`);
+      return;
     }
+
+    // Read the file
+    fs.readFile(filePath, (error, content) => {
+      if (error) {
+        if (error.code === 'ENOENT') {
+          // File not found
+          console.error(`File not found (ENOENT): ${filePath}`);
+          res.writeHead(404);
+          res.end(`File not found: ${url}`);
+        } else {
+          // Server error
+          console.error(`Server error: ${error.code} for ${filePath}`);
+          res.writeHead(500);
+          res.end(`Server Error: ${error.code}`);
+        }
+      } else {
+        // Success
+        console.log(`Serving: ${filePath} (${contentType})`);
+        
+        // Add content security policy for AR
+        const headers = { 
+          'Content-Type': contentType,
+          'Content-Length': content.length
+        };
+        
+        res.writeHead(200, headers);
+        res.end(content);
+      }
+    });
   });
 });
 

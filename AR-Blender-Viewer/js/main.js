@@ -5,89 +5,155 @@
 
 // Application namespace
 const ARApp = {
-    isInitialized: false,
-    arScene: null,
-    cameraEl: null,
-    modelUrl: './models/model.glb',
-    modelElement: null,
+    // DOM Elements
+    loadingScreen: null,
+    modelButton: null,
+    controlButtons: null,
+    modelSelectionModal: null,
     viewportSettings: {
-        zoom: 1.0,
-        maxZoom: 3.0,
-        minZoom: 0.5,
-        zoomStep: 0.1
+        zoomLevel: 1.0,
+        zoomMin: 0.5,
+        zoomMax: 3.0,
+        zoomStep: 0.2
     },
-    availableModels: [
-        { name: 'Default Model', path: './models/model.glb', thumbnail: 'default-model' }
-        // Add more models as they become available
-    ],
     orientation360Enabled: false,
-
+    isInitialized: false,
+    
     // Initialize the application
     init: function() {
-        if (this.isInitialized) return;
+        console.log('AR Blender Viewer initializing...');
         
-        // Get references to key elements
-        this.arScene = document.querySelector('a-scene');
-        this.cameraEl = document.querySelector('a-entity[camera]');
-        this.modelEl = document.querySelector('#model');
-        this.modelContainer = document.querySelector('#model-container');
-        this.modelAsset = document.querySelector('#model-asset');
-        
-        // Setup model selection modal
-        this.setupModelSelection();
-        
-        // Setup viewport controls
-        this.setupViewportControls();
-        
-        // Setup 360-degree view with device orientation
-        this.setup360View();
-        
-        // Check for mobile device
-        this.isMobile = this.checkIsMobile();
-        
-        // Force hide loading screen after delay
-        setTimeout(() => this.hideLoadingScreen(), 1500);
-        
-        // Ensure model is visible
-        if (this.modelEl) {
-            this.modelEl.setAttribute('visible', true);
-            console.log('Made model visible explicitly');
-        }
-        
-        // Add event listener for model loaded
-        if (this.modelEl) {
-            this.modelEl.addEventListener('model-loaded', (e) => {
-                console.log('Model loaded successfully!');
-                // Ensure model is visible after loading
-                setTimeout(() => {
-                    if (e.detail && e.detail.model) {
-                        console.log('Got model detail, making visible');
-                        const model = e.detail.model;
-                        model.visible = true;
-                        
-                        // Traverse all mesh objects and ensure they're visible
-                        model.traverse((node) => {
-                            if (node.isMesh) {
-                                node.frustumCulled = false;
-                                node.material.needsUpdate = true;
-                                console.log('Updated mesh visibility');
-                            }
-                        });
-                    }
-                    
-                    // Hide loading screen again just to be sure
-                    this.hideLoadingScreen();
-                }, 1000);
-            });
+        try {
+            if (this.isInitialized) return;
+            this.isInitialized = true;
             
-            // Add backup timeout in case model loading takes too long
+            // Get DOM Elements
+            this.loadingScreen = document.getElementById('loading-screen');
+            this.modelButton = document.getElementById('model-button');
+            this.controlButtons = document.querySelectorAll('.control-button');
+            this.modelSelectionModal = document.getElementById('model-selection-modal');
+            this.permissionsRequest = document.getElementById('permissions-request');
+            this.enableMotionButton = document.getElementById('enable-motion-button');
+            this.view360Button = document.getElementById('view360-button');
+            
+            // Check if elements exist
+            if (!this.loadingScreen) console.error('Loading screen element not found');
+            if (!this.modelButton) console.error('Model button element not found');
+            if (!this.modelSelectionModal) console.error('Model selection modal element not found');
+            
+            // Initialize UI Manager
+            UIManager.init();
+            
+            // Setup Event Listeners
+            this.setupEventListeners();
+            
+            // Setup Model Selection
+            this.setupModelSelection();
+            
+            // Setup Viewport Controls
+            this.setupViewportControls();
+            
+            // Setup 360 View
+            this.setup360View();
+            
+            // Hide loading screen after delay
             setTimeout(() => {
                 this.hideLoadingScreen();
-            }, 5000);
+            }, 3000);
+            
+            console.log('AR Blender Viewer initialized successfully!');
+            
+            // Show UI elements once everything is ready
+            document.body.classList.add('ready');
+        } catch (error) {
+            console.error('Error initializing AR Blender Viewer:', error);
+            this.showError('Failed to initialize AR Blender Viewer. ' + error.message);
         }
+    },
+    
+    // Show error message
+    showError: function(message) {
+        const errorMessage = document.getElementById('error-message');
+        const errorDescription = document.querySelector('.error-description');
         
-        // Mark as initialized
-        this.isInitialized = true;
+        if (errorMessage && errorDescription) {
+            errorDescription.textContent = message;
+            errorMessage.classList.remove('hidden');
+        } else {
+            console.error('Error elements not found', message);
+            alert('Error: ' + message);
+        }
+    },
+    
+    // Setup Event Listeners
+    setupEventListeners: function() {
+        try {
+            // Control Button Click Events
+            this.controlButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const buttonId = button.id;
+                    
+                    // Toggle active state for the button
+                    if (buttonId !== 'model-button' && buttonId !== 'reset-button') {
+                        this.setActiveControl(button);
+                    }
+                    
+                    // Handle button actions
+                    switch(buttonId) {
+                        case 'place-button':
+                            UIManager.showPlacementIndicator();
+                            UIManager.setInteractionMode('place');
+                            break;
+                        case 'rotate-button':
+                            UIManager.setInteractionMode('rotate');
+                            break;
+                        case 'scale-button':
+                            UIManager.setInteractionMode('scale');
+                            break;
+                        case 'pan-button':
+                            UIManager.setInteractionMode('pan');
+                            break;
+                        case 'view360-button':
+                            this.toggle360View();
+                            break;
+                        case 'reset-button':
+                            UIManager.resetModel();
+                            break;
+                        case 'model-button':
+                            UIManager.showModelSelectionModal();
+                            break;
+                    }
+                });
+            });
+            
+            // Window resize event
+            window.addEventListener('resize', () => {
+                console.log('Window resized');
+                // Make any adjustments needed on resize
+            });
+            
+            // Error handling for A-Frame scene
+            const scene = document.querySelector('a-scene');
+            if (scene) {
+                scene.addEventListener('renderstart', () => {
+                    console.log('A-Frame scene render started');
+                });
+                
+                scene.addEventListener('loaded', () => {
+                    console.log('A-Frame scene loaded');
+                    UIManager.showNotification('AR Scene loaded successfully');
+                });
+                
+                scene.addEventListener('error', (error) => {
+                    console.error('A-Frame scene error:', error);
+                    this.showError('Error loading AR scene');
+                });
+            } else {
+                console.error('A-Frame scene not found');
+            }
+        } catch (error) {
+            console.error('Error setting up event listeners:', error);
+        }
     },
     
     // Setup model selection
@@ -356,14 +422,14 @@ const ARApp = {
     // Zoom the viewport in/out
     zoomViewport: function(delta) {
         // Calculate new zoom level
-        let newZoom = this.viewportSettings.zoom + delta;
+        let newZoom = this.viewportSettings.zoomLevel + delta;
         
         // Clamp to min/max values
-        newZoom = Math.max(this.viewportSettings.minZoom, 
-                           Math.min(this.viewportSettings.maxZoom, newZoom));
+        newZoom = Math.max(this.viewportSettings.zoomMin, 
+                           Math.min(this.viewportSettings.zoomMax, newZoom));
         
         // Update zoom setting
-        this.viewportSettings.zoom = newZoom;
+        this.viewportSettings.zoomLevel = newZoom;
         
         // Apply zoom to the scene camera
         if (this.cameraEl) {
@@ -392,22 +458,24 @@ const ARApp = {
         }
         
         // Reset zoom
-        this.viewportSettings.zoom = 1.0;
+        this.viewportSettings.zoomLevel = 1.0;
     },
     
     // Hide loading screen
     hideLoadingScreen: function() {
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-            loadingScreen.classList.add('hidden');
-            console.log('Hiding loading screen');
-        }
-        
-        // Also ensure instruction overlay is hidden
-        const instructionOverlay = document.getElementById('instruction-overlay');
-        if (instructionOverlay) {
-            instructionOverlay.style.display = 'none';
-            console.log('Hiding instruction overlay');
+        if (this.loadingScreen) {
+            this.loadingScreen.classList.add('hidden');
+            
+            // Show control panel and viewport controls
+            const controlPanel = document.getElementById('control-panel');
+            const viewportControls = document.getElementById('viewport-controls');
+            
+            if (controlPanel) controlPanel.classList.remove('hidden');
+            if (viewportControls) viewportControls.classList.remove('hidden');
+            
+            UIManager.showNotification('AR Blender Viewer ready!');
+        } else {
+            console.error('Loading screen element not found');
         }
     },
     
@@ -543,35 +611,6 @@ const ARApp = {
         }
     },
     
-    // Show error message to user
-    showError: function(title, message) {
-        const errorMessageElement = document.getElementById('error-message');
-        const errorTitleElement = document.querySelector('#error-message .error-title');
-        const errorDescriptionElement = document.querySelector('#error-message .error-description');
-        
-        if (errorTitleElement) {
-            errorTitleElement.textContent = title;
-        }
-        
-        if (errorDescriptionElement) {
-            errorDescriptionElement.textContent = message;
-        }
-        
-        if (errorMessageElement) {
-            errorMessageElement.classList.remove('hidden');
-        }
-        
-        // Add reload button functionality
-        const reloadButton = document.getElementById('reload-button');
-        if (reloadButton) {
-            reloadButton.addEventListener('click', () => {
-                window.location.reload();
-            });
-        }
-        
-        console.error(title, message);
-    },
-    
     // Validate model parameter to prevent security issues
     isValidModelParameter: function(param) {
         // Only allow paths to .glb or .gltf files within the models directory
@@ -594,125 +633,17 @@ const ARApp = {
     }
 };
 
-// Initialize the application when the document is ready
+// Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize the application
-    ARApp.init();
-    
-    // Setup additional capabilities
-    ARApp.setupOfflineCapabilities();
-    ARApp.setupErrorHandling();
-    
-    // Make sure A-Frame scene is properly shown
     setTimeout(() => {
-        document.querySelectorAll('canvas.a-canvas').forEach(canvas => {
-            canvas.style.zIndex = '1';
-            canvas.style.width = '100%';
-            canvas.style.height = '100%';
-        });
-    }, 1000);
+        ARApp.init();
+    }, 1000); // Short delay to ensure all resources are loaded
 });
 
-// Create service worker for offline capabilities
-function createServiceWorker() {
-    // Create a service worker file if it doesn't exist
-    if ('serviceWorker' in navigator) {
-        const swContent = `
-        // AR Blender Viewer Service Worker for offline capabilities
-        
-        const CACHE_NAME = 'ar-viewer-cache-v1';
-        const urlsToCache = [
-            '/',
-            '/index.html',
-            '/css/styles.css',
-            '/js/main.js',
-            '/js/ar-components.js',
-            '/js/ui-manager.js',
-            '/models/model.glb',
-            '/img/shadow.png',
-            '/img/favicon.png',
-            '/img/help.svg',
-            '/img/move.svg',
-            '/img/reset.svg',
-            '/img/rotate.svg',
-            '/img/scale.svg',
-            '/img/tap.svg',
-            '/img/zoom-in.svg',
-            '/img/zoom-out.svg',
-            '/img/center.svg',
-            '/img/model.svg',
-            '/img/upload.svg'
-        ];
-        
-        // Install event - cache resources
-        self.addEventListener('install', event => {
-            event.waitUntil(
-                caches.open(CACHE_NAME)
-                    .then(cache => {
-                        console.log('Opened cache');
-                        return cache.addAll(urlsToCache);
-                    })
-            );
-        });
-        
-        // Fetch event - serve from cache or fetch from network
-        self.addEventListener('fetch', event => {
-            event.respondWith(
-                caches.match(event.request)
-                    .then(response => {
-                        // Cache hit - return response
-                        if (response) {
-                            return response;
-                        }
-                        
-                        // Clone the request
-                        const fetchRequest = event.request.clone();
-                        
-                        return fetch(fetchRequest).then(
-                            response => {
-                                // Check if valid response
-                                if (!response || response.status !== 200 || response.type !== 'basic') {
-                                    return response;
-                                }
-                                
-                                // Clone the response
-                                const responseToCache = response.clone();
-                                
-                                caches.open(CACHE_NAME)
-                                    .then(cache => {
-                                        cache.put(event.request, responseToCache);
-                                    });
-                                
-                                return response;
-                            }
-                        );
-                    })
-            );
-        });
-        
-        // Activate event - clean up old caches
-        self.addEventListener('activate', event => {
-            const cacheWhitelist = [CACHE_NAME];
-            
-            event.waitUntil(
-                caches.keys().then(cacheNames => {
-                    return Promise.all(
-                        cacheNames.map(cacheName => {
-                            if (cacheWhitelist.indexOf(cacheName) === -1) {
-                                return caches.delete(cacheName);
-                            }
-                        })
-                    );
-                })
-            );
-        });
-        `;
-        
-        // Log but don't actually create the file in this example
-        console.log('Service worker content would be created here in a real app.');
+// Handle errors globally
+window.addEventListener('error', (event) => {
+    console.error('Global error caught:', event.error);
+    if (ARApp && typeof ARApp.showError === 'function') {
+        ARApp.showError('An error occurred: ' + (event.error ? event.error.message : 'Unknown error'));
     }
-}
-
-// Expose to global scope for debugging and development purposes
-window.ARApp = ARApp;
-window.createServiceWorker = createServiceWorker;
+});

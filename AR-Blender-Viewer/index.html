@@ -36,7 +36,7 @@
     </div>
     
     <!-- Model Selection Modal -->
-    <div id="model-selection-modal" class="modal">
+    <div id="model-selection-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Select 3D Model</h2>
@@ -87,7 +87,7 @@
             <i class="fas fa-arrows-alt"></i>
             <span>Pan</span>
         </div>
-        <div class="control-button" id="view360-button" class="active">
+        <div class="control-button" id="view360-button">
             <i class="fas fa-street-view"></i>
             <span>360° View</span>
         </div>
@@ -115,9 +115,9 @@
         embedded>
         
         <!-- Assets -->
-        <a-assets id="a-assets">
-            <a-asset-item id="model-asset" src="./models/model.glb"></a-asset-item>
-            <img id="shadow-img" src="https://cdn.glitch.global/3dee4cf9-9c12-4436-8e41-c294b4b9227f/shadow.png">
+        <a-assets id="a-assets" timeout="30000">
+            <a-asset-item id="model-asset" src="./models/model.glb" response-type="arraybuffer"></a-asset-item>
+            <img id="shadow-img" src="https://cdn.glitch.global/3dee4cf9-9c12-4436-8e41-c294b4b9227f/shadow.png" crossorigin="anonymous">
         </a-assets>
         
         <!-- Camera -->
@@ -125,7 +125,6 @@
             id="camera" 
             camera 
             position="0 1.6 0" 
-            device-orientation-controls
             look-controls="magicWindowTrackingEnabled: true; reverseMouseDrag: false;">
             
             <!-- Cursor for interaction -->
@@ -161,7 +160,7 @@
                 rotation="0 0 0"
                 scale="1 1 1"
                 visible="true"
-                model-controls>
+                model-controls="mode: place">
                 
                 <!-- Shadow -->
                 <a-image
@@ -249,5 +248,8 @@
             <button id="enable-motion-button" class="primary-button">Enable 360° View</button>
         </div>
     </div>
+    
+    <!-- Notification Container -->
+    <div id="notification" class="notification"></div>
 </body>
 </html>

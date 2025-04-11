@@ -3,410 +3,294 @@
  * Handles all UI interactions, status updates, and user controls
  */
 
-class UIManager {
-    constructor() {
-        // UI Elements
-        this.loadingScreen = document.getElementById('loading-screen');
-        this.arStatus = document.getElementById('ar-status');
-        this.controlPanel = document.getElementById('control-panel');
-        this.viewportControls = document.getElementById('viewport-controls');
-        this.modelSelectionModal = document.getElementById('model-selection-modal');
-        this.helpModal = document.getElementById('help-modal');
-        
-        // Control Buttons
-        this.placeButton = document.getElementById('place-button');
-        this.rotateButton = document.getElementById('rotate-button');
-        this.scaleButton = document.getElementById('scale-button');
-        this.panButton = document.getElementById('pan-button');
-        this.resetButton = document.getElementById('reset-button');
-        this.modelButton = document.getElementById('model-button');
-        this.helpButton = document.getElementById('help-button');
-        this.view360Button = document.getElementById('view360-button');
-        
-        // Viewport Controls
-        this.zoomInButton = document.getElementById('zoom-in-button');
-        this.zoomOutButton = document.getElementById('zoom-out-button');
-        this.centerViewButton = document.getElementById('center-view-button');
-        
-        // Close buttons
-        this.closeModelSelectionButton = document.getElementById('close-model-selection');
-        this.closeHelpButton = document.querySelector('#help-modal .close-button');
-        
-        // State
-        this.isARStarted = false;
-        this.isModelPlaced = false;
-        this.activeInteractionMode = 'none';
-        
-        // Analytics data
-        this.analytics = {
-            sessionStartTime: Date.now(),
-            interactions: 0
-        };
-        
-        // Initialize
-        this.init();
-    }
+const UIManager = {
+    // DOM Elements
+    controlPanel: null,
+    placementIndicator: null,
+    modelSelectionModal: null,
+    closeModelSelectionButton: null,
+    helpModal: null,
+    helpButton: null,
+    closeHelpButton: null,
+    errorMessage: null,
+    notification: null,
+    arStatus: null,
+    notificationTimeout: null,
     
-    init() {
-        // Setup event listeners
-        this.setupEventListeners();
-        
-        // Show appropriate starting screen
-        this.hideLoadingScreen();
-        
-        // Log analytics event
-        this.logAnalytics('session_start', {
-            userAgent: navigator.userAgent,
-            screenSize: `${window.innerWidth}x${window.innerHeight}`
-        });
-    }
+    // Current interaction mode
+    interactionMode: 'place',
     
-    setupEventListeners() {
-        // Control Panel Buttons
-        if (this.placeButton) {
-            this.placeButton.addEventListener('click', () => {
-                this.setInteractionMode('place');
-                this.logAnalytics('select_interaction_mode', { mode: 'place' });
-            });
-        }
+    // Initialize the UI Manager
+    init: function() {
+        console.log('UI Manager initializing...');
         
-        if (this.rotateButton) {
-            this.rotateButton.addEventListener('click', () => {
-                this.setInteractionMode('rotate');
-                this.logAnalytics('select_interaction_mode', { mode: 'rotate' });
-            });
-        }
-        
-        if (this.scaleButton) {
-            this.scaleButton.addEventListener('click', () => {
-                this.setInteractionMode('scale');
-                this.logAnalytics('select_interaction_mode', { mode: 'scale' });
-            });
-        }
-        
-        if (this.panButton) {
-            this.panButton.addEventListener('click', () => {
-                this.setInteractionMode('pan');
-                this.logAnalytics('select_interaction_mode', { mode: 'pan' });
-            });
-        }
-        
-        if (this.resetButton) {
-            this.resetButton.addEventListener('click', () => {
-                this.resetScene();
-                this.setInteractionMode('none');
-                this.logAnalytics('reset_scene');
-            });
-        }
-        
-        if (this.modelButton) {
-            this.modelButton.addEventListener('click', () => {
-                this.showModelSelectionModal();
-                this.logAnalytics('open_model_selection');
-            });
-        }
-        
-        if (this.view360Button) {
-            this.view360Button.addEventListener('click', () => {
-                this.setInteractionMode('view360');
-                this.logAnalytics('select_interaction_mode', { mode: 'view360' });
-            });
-        }
-        
-        // Viewport Controls
-        if (this.zoomInButton) {
-            this.zoomInButton.addEventListener('click', () => {
-                this.zoomViewport(0.1);
-                this.logAnalytics('zoom_in');
-            });
-        }
-        
-        if (this.zoomOutButton) {
-            this.zoomOutButton.addEventListener('click', () => {
-                this.zoomViewport(-0.1);
-                this.logAnalytics('zoom_out');
-            });
-        }
-        
-        if (this.centerViewButton) {
-            this.centerViewButton.addEventListener('click', () => {
-                this.centerViewport();
-                this.logAnalytics('center_view');
-            });
-        }
-        
-        // Help Button
-        if (this.helpButton) {
-            this.helpButton.addEventListener('click', () => {
-                this.showHelpModal();
-                this.logAnalytics('open_help');
-            });
-        }
-        
-        // Close buttons
-        if (this.closeModelSelectionButton) {
-            this.closeModelSelectionButton.addEventListener('click', () => {
-                this.hideModelSelectionModal();
-                this.logAnalytics('close_model_selection');
-            });
-        }
-        
-        if (this.closeHelpButton) {
-            this.closeHelpButton.addEventListener('click', () => {
-                this.hideHelpModal();
-                this.logAnalytics('close_help');
-            });
-        }
-        
-        // Listen for A-Frame events
-        window.addEventListener('model-loaded', () => {
-            this.onModelLoaded();
-            this.logAnalytics('model_loaded');
-        });
-        
-        // Listen for tracking status changes from AR.js
-        document.addEventListener('arTrackingFound', () => {
-            this.updateARStatus('Tracking OK', 'connected');
-            this.logAnalytics('tracking_found');
-        });
-        
-        document.addEventListener('arTrackingLost', () => {
-            this.updateARStatus('Tracking lost', '');
-            this.logAnalytics('tracking_lost');
-        });
-        
-        // Handle scene loaded
-        const scene = document.querySelector('a-scene');
-        if (scene.hasLoaded) {
-            this.onSceneLoaded();
-        } else {
-            scene.addEventListener('loaded', () => this.onSceneLoaded());
-        }
-        
-        // Keyboard controls for accessibility
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                this.hideAllModals();
+        try {
+            // Get DOM Elements
+            this.controlPanel = document.getElementById('control-panel');
+            this.placementIndicator = document.getElementById('placement-indicator');
+            this.modelSelectionModal = document.getElementById('model-selection-modal');
+            this.closeModelSelectionButton = document.getElementById('close-model-selection');
+            this.helpModal = document.getElementById('help-modal');
+            this.helpButton = document.getElementById('help-button');
+            this.closeHelpButton = document.querySelector('#help-modal .close-button');
+            this.errorMessage = document.getElementById('error-message');
+            this.notification = document.getElementById('notification');
+            this.arStatus = document.getElementById('ar-status');
+            
+            // Create notification element if it doesn't exist
+            if (!this.notification) {
+                this.createNotificationElement();
             }
-        });
-    }
-    
-    onSceneLoaded() {
-        // Show control panel once scene is loaded
-        setTimeout(() => {
-            this.showControlPanel();
-            this.showViewportControls();
-            this.updateARStatus('Ready', 'connected');
-        }, 1000);
-        
-        // Make camera and model reference available
-        this.camera = document.getElementById('camera');
-        this.modelContainer = document.getElementById('model-container');
-        
-        // Ensure browser compatibility with AR features
-        if (!this.checkBrowserCompatibility()) {
-            this.showError('Browser Compatibility Issue', 
-                'Your browser may not support all required AR features. For best experience, use recent versions of Chrome or Safari on a modern device.');
+            
+            // Setup event listeners
+            this.setupEventListeners();
+            
+            console.log('UI Manager initialized successfully!');
+        } catch (error) {
+            console.error('Error initializing UI Manager:', error);
         }
-    }
+    },
     
-    onModelLoaded() {
-        this.hideLoadingScreen();
-        this.isModelPlaced = true;
-        
-        // Update controls visibility
-        this.showControlPanel();
-        this.showViewportControls();
-    }
+    // Create notification element
+    createNotificationElement: function() {
+        this.notification = document.createElement('div');
+        this.notification.id = 'notification';
+        this.notification.className = 'notification';
+        document.body.appendChild(this.notification);
+        console.log('Created notification element');
+    },
     
-    checkBrowserCompatibility() {
-        // Check for WebGL support
-        const canvas = document.createElement('canvas');
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        if (!gl) {
-            return false;
-        }
-        
-        // Check for camera access
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            return false;
-        }
-        
-        return true;
-    }
-    
-    setInteractionMode(mode) {
-        this.activeInteractionMode = mode;
-        
-        // Update button states
-        const buttons = document.querySelectorAll('.control-button');
-        buttons.forEach(button => button.classList.remove('active'));
-        
-        // Set active button
-        if (mode !== 'none') {
-            const activeButton = document.getElementById(`${mode}-button`);
-            if (activeButton) {
-                activeButton.classList.add('active');
+    // Setup event listeners
+    setupEventListeners: function() {
+        try {
+            // Close buttons for modals
+            if (this.closeModelSelectionButton) {
+                this.closeModelSelectionButton.addEventListener('click', () => {
+                    this.hideModelSelectionModal();
+                });
             }
-        }
-        
-        // Notify the model-controls component about the mode change
-        const modelContainer = document.getElementById('model-container');
-        if (modelContainer && modelContainer.components && modelContainer.components['model-controls']) {
-            // Handle mode change via A-Frame's ways or dispatch an event
-            window.dispatchEvent(new CustomEvent('model-interaction-mode', {
-                detail: { mode: mode }
-            }));
-        }
-    }
-    
-    resetScene() {
-        // Reset camera and model
-        if (this.camera) {
-            this.camera.setAttribute('position', '0 1.6 0');
-            this.camera.setAttribute('rotation', '0 0 0');
-        }
-        
-        if (this.modelContainer) {
-            this.modelContainer.setAttribute('position', '0 0 -3');
-            this.modelContainer.setAttribute('rotation', '0 0 0');
-            this.modelContainer.setAttribute('scale', '1 1 1');
-        }
-        
-        // Reset interaction mode
-        this.setInteractionMode('none');
-    }
-    
-    zoomViewport(delta) {
-        if (window.ARApp) {
-            window.ARApp.zoomViewport(delta);
-        }
-    }
-    
-    centerViewport() {
-        if (window.ARApp) {
-            window.ARApp.centerViewport();
-        }
-    }
-    
-    updateARStatus(text, statusClass) {
-        const statusDot = document.querySelector('.status-dot');
-        const statusText = document.querySelector('.status-text');
-        
-        if (statusText) {
-            statusText.textContent = text;
-        }
-        
-        if (statusDot) {
-            statusDot.className = 'status-dot';
-            if (statusClass) {
-                statusDot.classList.add(statusClass);
+            
+            if (this.closeHelpButton) {
+                this.closeHelpButton.addEventListener('click', () => {
+                    this.helpModal.classList.add('hidden');
+                });
             }
+            
+            // Help button
+            if (this.helpButton) {
+                this.helpButton.addEventListener('click', () => {
+                    this.helpModal.classList.remove('hidden');
+                });
+            }
+            
+            // Reload button
+            const reloadButton = document.getElementById('reload-button');
+            if (reloadButton) {
+                reloadButton.addEventListener('click', () => {
+                    window.location.reload();
+                });
+            }
+            
+            // Close modal when clicking outside
+            window.addEventListener('click', (event) => {
+                if (event.target.classList.contains('modal')) {
+                    event.target.classList.add('hidden');
+                }
+            });
+            
+            console.log('Event listeners setup complete');
+        } catch (error) {
+            console.error('Error setting up event listeners:', error);
         }
-    }
+    },
     
-    showControlPanel() {
-        if (this.controlPanel) {
-            this.controlPanel.classList.remove('hidden');
+    // Show placement indicator
+    showPlacementIndicator: function() {
+        if (this.placementIndicator) {
+            this.placementIndicator.classList.remove('hidden');
         }
-    }
+        this.setInteractionMode('place');
+    },
     
-    hideControlPanel() {
-        if (this.controlPanel) {
-            this.controlPanel.classList.add('hidden');
+    // Hide placement indicator
+    hidePlacementIndicator: function() {
+        if (this.placementIndicator) {
+            this.placementIndicator.classList.add('hidden');
         }
-    }
+    },
     
-    showViewportControls() {
-        if (this.viewportControls) {
-            this.viewportControls.classList.remove('hidden');
-        }
-    }
-    
-    hideViewportControls() {
-        if (this.viewportControls) {
-            this.viewportControls.classList.add('hidden');
-        }
-    }
-    
-    showModelSelectionModal() {
+    // Show model selection modal
+    showModelSelectionModal: function() {
         if (this.modelSelectionModal) {
             this.modelSelectionModal.classList.remove('hidden');
         }
-    }
+    },
     
-    hideModelSelectionModal() {
+    // Hide model selection modal
+    hideModelSelectionModal: function() {
         if (this.modelSelectionModal) {
             this.modelSelectionModal.classList.add('hidden');
         }
-    }
+    },
     
-    showHelpModal() {
-        if (this.helpModal) {
-            this.helpModal.classList.remove('hidden');
+    // Show error message
+    showError: function(message) {
+        if (this.errorMessage) {
+            const errorDescription = this.errorMessage.querySelector('.error-description');
+            if (errorDescription) {
+                errorDescription.textContent = message;
+            }
+            this.errorMessage.classList.remove('hidden');
+        } else {
+            console.error('Error message element not found');
+            alert('Error: ' + message);
         }
-    }
+    },
     
-    hideHelpModal() {
-        if (this.helpModal) {
-            this.helpModal.classList.add('hidden');
+    // Hide error message
+    hideError: function() {
+        if (this.errorMessage) {
+            this.errorMessage.classList.add('hidden');
         }
-    }
+    },
     
-    hideAllModals() {
-        this.hideModelSelectionModal();
-        this.hideHelpModal();
-    }
-    
-    hideLoadingScreen() {
-        if (this.loadingScreen) {
-            this.loadingScreen.classList.add('hidden');
+    // Show notification
+    showNotification: function(message, duration = 3000) {
+        console.log('Showing notification:', message);
+        
+        try {
+            if (!this.notification) {
+                this.createNotificationElement();
+            }
+            
+            this.notification.textContent = message;
+            this.notification.classList.add('show');
+            
+            // Clear any existing timeout
+            if (this.notificationTimeout) {
+                clearTimeout(this.notificationTimeout);
+            }
+            
+            // Hide after duration
+            this.notificationTimeout = setTimeout(() => {
+                this.hideNotification();
+            }, duration);
+        } catch (error) {
+            console.error('Error showing notification:', error);
         }
-    }
+    },
     
-    showError(title, message) {
-        const errorMessage = document.getElementById('error-message');
-        const errorTitle = document.querySelector('#error-message .error-title');
-        const errorDescription = document.querySelector('#error-message .error-description');
-        
-        if (errorTitle && errorDescription) {
-            errorTitle.textContent = title;
-            errorDescription.textContent = message;
+    // Hide notification
+    hideNotification: function() {
+        if (this.notification) {
+            this.notification.classList.remove('show');
         }
-        
-        if (errorMessage) {
-            errorMessage.classList.remove('hidden');
-        }
-        
-        this.logAnalytics('error', { title, message });
-    }
+    },
     
-    showNotification(message, duration = 3000) {
-        let notification = document.getElementById('notification');
-        
-        if (!notification) {
-            notification = document.createElement('div');
-            notification.id = 'notification';
-            notification.className = 'notification';
-            document.body.appendChild(notification);
+    // Set AR status
+    setARStatus: function(status) {
+        if (this.arStatus) {
+            const statusText = this.arStatus.querySelector('.status-text');
+            const statusDot = this.arStatus.querySelector('.status-dot');
+            
+            if (statusText && statusDot) {
+                statusText.textContent = status;
+                
+                // Update status dot color based on status
+                statusDot.className = 'status-dot';
+                if (status.includes('Ready')) {
+                    statusDot.classList.add('status-ready');
+                } else if (status.includes('Error')) {
+                    statusDot.classList.add('status-error');
+                } else {
+                    statusDot.classList.add('status-working');
+                }
+            }
         }
-        
-        notification.textContent = message;
-        notification.classList.add('show');
-        
-        // Auto-hide after duration
-        setTimeout(() => {
-            notification.classList.remove('show');
-        }, duration);
-    }
+    },
     
-    logAnalytics(eventName, eventData = {}) {
-        this.analytics.interactions++;
-        console.log(`Analytics: ${eventName}`, eventData);
+    // Set interaction mode
+    setInteractionMode: function(mode) {
+        const validModes = ['place', 'rotate', 'scale', 'pan', 'view360'];
         
-        // Implement actual analytics tracking here if needed
+        if (validModes.includes(mode)) {
+            this.interactionMode = mode;
+            
+            // Update UI to reflect current mode
+            if (this.controlPanel) {
+                const buttons = this.controlPanel.querySelectorAll('.control-button');
+                buttons.forEach(button => {
+                    button.classList.remove('active');
+                });
+                
+                const modeButton = document.getElementById(`${mode}-button`);
+                if (modeButton) {
+                    modeButton.classList.add('active');
+                }
+            }
+            
+            // Send interaction mode to AR components
+            const modelContainer = document.getElementById('model-container');
+            if (modelContainer) {
+                modelContainer.setAttribute('model-controls', `mode: ${mode}`);
+            }
+            
+            // Show feedback to user
+            this.showNotification(`Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`);
+            console.log('Interaction mode set to:', mode);
+        }
+    },
+    
+    // Reset model
+    resetModel: function() {
+        const modelContainer = document.getElementById('model-container');
+        
+        if (modelContainer) {
+            // Reset position, rotation, and scale
+            modelContainer.setAttribute('position', '0 0 -3');
+            modelContainer.setAttribute('rotation', '0 0 0');
+            modelContainer.setAttribute('scale', '1 1 1');
+            
+            // Show feedback
+            this.showNotification('Model reset to default position and size');
+        }
+    },
+    
+    // Load model
+    loadModel: function(modelPath, modelName) {
+        const modelAsset = document.getElementById('model-asset');
+        const model = document.getElementById('model');
+        
+        if (modelAsset && model) {
+            // Show loading feedback
+            this.showNotification(`Loading model: ${modelName}...`);
+            
+            // Update the model asset source
+            modelAsset.setAttribute('src', modelPath);
+            
+            // Update the model
+            model.setAttribute('gltf-model', '');
+            
+            // Wait for the model to load
+            modelAsset.addEventListener('loaded', () => {
+                model.setAttribute('gltf-model', `#model-asset`);
+                this.showNotification(`Model loaded: ${modelName}`);
+                this.hideModelSelectionModal();
+                
+                // Reset model position, rotation, and scale
+                this.resetModel();
+            }, { once: true });
+        }
+    },
+    
+    // Log analytics
+    logAnalytics: function(eventName, eventData) {
+        console.log('Analytics:', eventName, eventData);
+        // In a real app, this would send data to an analytics service
     }
-}
+};
 
-// Create and export UI manager
-window.UIManager = new UIManager();
+// Export the UI Manager for module use
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = UIManager;
+}
