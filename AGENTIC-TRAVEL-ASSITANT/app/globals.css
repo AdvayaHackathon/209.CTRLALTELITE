@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --foreground-rgb: 15, 52, 96;
+  --background-start-rgb: 249, 246, 242;
+  --background-end-rgb: 239, 230, 219;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+  font-family: 'Poppins', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', serif;
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 font-medium rounded-md transition-all duration-200;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-dark;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-dark hover:bg-accent;
+  }
+  
+  .input {
+    @apply w-full px-4 py-2 border border-tan-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 bg-tan-100;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg p-6 shadow-card hover:shadow-lg transition-shadow duration-300 border border-tan-200;
+  }
+}
