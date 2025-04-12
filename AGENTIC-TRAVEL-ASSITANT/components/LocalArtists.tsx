@@ -39,13 +39,11 @@ const LocalArtists: React.FC<LocalArtistsProps> = ({ artists }) => {
 
   return (
     <div className="space-y-6">
-      {isLimitedInfo && (
-        <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">
-          <p className="text-sm">
-            Information is limited online. Please check with local residents or marketplaces for more details.
-          </p>
-        </div>
-      )}
+      <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">
+        <p className="text-sm font-bold bg-yellow-100 p-2 rounded">
+          <strong>Information is limited online. Please check with local residents or marketplaces for more details.</strong>
+        </p>
+      </div>
       
       {artists.map((artist, index) => (
         <div key={index} className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow">
