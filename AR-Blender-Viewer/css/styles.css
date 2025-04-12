@@ -18,6 +18,154 @@ body, html {
     position: relative;
 }
 
+/* TimeScape Explorer Styles */
+.fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #1a237e;
+    background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.welcome-container {
+    max-width: 800px;
+    width: 100%;
+    text-align: center;
+    padding: 20px;
+    animation: fadeIn 0.8s ease;
+}
+
+.welcome-container h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+    color: rgba(255,255,255,0.9);
+}
+
+.location-selection {
+    background-color: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.location-selection h2 {
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    color: #fff;
+}
+
+.location-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+}
+
+.location-card {
+    width: 100%;
+    max-width: 300px;
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.location-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+.location-image {
+    height: 160px;
+    background-size: cover;
+    background-position: center;
+}
+
+.ayodhya-image {
+    background-image: url('https://www.tourmyindia.com/blog//wp-content/uploads/2021/08/Ram-Mandir-Ayodhya.jpg');
+}
+
+.location-name {
+    padding: 15px 15px 5px;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.location-description {
+    padding: 0 15px 15px;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.8);
+}
+
+.surface-selection-container {
+    text-align: center;
+    width: 100%;
+    max-width: 500px;
+    animation: fadeIn 0.8s ease;
+}
+
+.instruction-panel {
+    background-color: rgba(0,0,0,0.7);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.instruction-panel h2 {
+    margin-bottom: 15px;
+    color: #fff;
+}
+
+.instruction-panel p {
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.hint {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.8);
+    font-style: italic;
+}
+
+.surface-indicator-animation {
+    width: 160px;
+    height: 80px;
+    margin: 20px auto;
+    background-image: url('https://img.icons8.com/pastel-glyph/64/ffffff/mobile-phone-scanning--v2.png');
+    background-size: 64px;
+    background-position: center;
+    background-repeat: no-repeat;
+    animation: scanSurface 2s infinite ease-in-out;
+}
+
+@keyframes scanSurface {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(10px) rotate(5deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* Fix for A-Frame and white screen issues */
 .a-canvas {
     position: absolute !important;
@@ -166,25 +314,67 @@ a-scene {
 }
 
 .viewport-control-button {
-    width: 45px;
-    height: 45px;
-    background-color: rgba(255, 255, 255, 0.8);
+    width: 40px;
+    height: 40px;
+    background-color: rgba(52, 152, 219, 0.8);
+    color: white;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    margin: 0 5px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease-in-out;
 }
 
-.viewport-control-button img {
-    width: 20px;
-    height: 20px;
+.viewport-control-button:hover {
+    background-color: rgba(41, 128, 185, 1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
 }
 
-.viewport-control-button:active {
-    transform: scale(0.95);
+/* Specific styling for the switch model button */
+#switch-model-button {
+    background-color: rgba(142, 68, 173, 0.9);
+    position: relative;
+    animation: pulse-highlight 2s infinite;
+    box-shadow: 0 0 10px rgba(142, 68, 173, 0.5);
+    transform: scale(1.1);
+    z-index: 1000;
+}
+
+#switch-model-button:hover {
+    background-color: rgba(142, 68, 173, 1);
+    transform: scale(1.2) translateY(-2px);
+    animation: none;
+    box-shadow: 0 5px 15px rgba(142, 68, 173, 0.7);
+}
+
+#switch-model-button:active {
+    transform: scale(1.05);
+    background-color: rgba(120, 40, 150, 1);
+}
+
+#switch-model-button i {
+    font-size: 20px;
+    color: white;
+}
+
+/* Animation for switch model button */
+@keyframes pulse-highlight {
+    0% {
+        box-shadow: 0 0 0 0 rgba(142, 68, 173, 0.7);
+        transform: scale(1.1);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(142, 68, 173, 0);
+        transform: scale(1.15);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(142, 68, 173, 0);
+        transform: scale(1.1);
+    }
 }
 
 /* Placement Indicator */
@@ -433,51 +623,56 @@ input[type="file"] {
     font-size: 14px;
 }
 
-/* Error Messages */
+/* Error Message */
 #error-message {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: rgba(0, 0, 0, 0.9);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 9999;
+    z-index: 10000;
+    transition: opacity 0.3s ease;
 }
 
-.error-content {
-    background-color: white;
-    padding: 30px;
-    border-radius: 10px;
-    text-align: center;
+.error-container {
+    background-color: #fff;
+    color: #333;
+    border-radius: 8px;
+    padding: 20px;
     max-width: 80%;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
-.error-title {
+.error-header {
+    color: #e74c3c;
     font-size: 20px;
     font-weight: bold;
-    margin-bottom: 10px;
-    color: #e74c3c;
+    margin-bottom: 15px;
 }
 
 .error-description {
+    font-size: 16px;
     margin-bottom: 20px;
-    color: #555;
+    line-height: 1.5;
 }
 
-.primary-button {
+.reload-button {
     background-color: #3498db;
     color: white;
     border: none;
     padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
+    border-radius: 4px;
     font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
 }
 
-.primary-button:hover {
+.reload-button:hover {
     background-color: #2980b9;
 }
 
@@ -506,6 +701,31 @@ input[type="file"] {
 }
 
 .notification.show {
+    opacity: 1;
+}
+
+/* Notification */
+#notification {
+    position: fixed;
+    top: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    font-size: 16px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 9999;
+    text-align: center;
+    max-width: 80%;
+    pointer-events: none;
+    border: 2px solid #3498db;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+#notification.show {
     opacity: 1;
 }
 
@@ -548,4 +768,750 @@ input[type="file"] {
 .a-fullscreen .a-canvas {
     width: 100vw !important;
     height: 100vh !important;
+}
+
+/* Camera Fixes */
+a-scene, canvas.a-canvas, .a-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 1 !important;
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* Fix for camera feed showing up black */
+body .a-canvas {
+    background-color: transparent !important;
+}
+
+video.a-dom-overlay {
+    display: block !important;
+}
+
+/* Model Controls Panel */
+.controls-panel {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 320px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+    color: #fff;
+    transform: translateY(calc(100% - 50px));
+    transition: transform 0.3s ease;
+    border: 1px solid rgba(52, 152, 219, 0.5);
+    display: block !important; /* Ensure it's visible */
+}
+
+.controls-panel.expanded {
+    transform: translateY(0);
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    height: 50px;
+    box-sizing: border-box;
+}
+
+.panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: normal;
+}
+
+.toggle-button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 5px;
+    transition: transform 0.3s ease;
+}
+
+.controls-panel.expanded .toggle-button i {
+    transform: rotate(180deg);
+}
+
+.panel-content {
+    padding: 10px 15px 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.control-group {
+    margin-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 15px;
+}
+
+.control-group:last-child {
+    border-bottom: none;
+}
+
+.control-label {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #3498db;
+}
+
+.control-label-small {
+    width: 30px;
+    font-size: 14px;
+}
+
+.control-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 5px;
+    border-radius: 5px;
+    background: #444;
+    outline: none;
+    margin: 0 10px;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #3498db;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #3498db;
+    cursor: pointer;
+}
+
+.value-display {
+    width: 40px;
+    text-align: right;
+    font-size: 14px;
+}
+
+.control-button-full {
+    width: 100%;
+    padding: 10px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 16px;
+    transition: background-color 0.2s;
+}
+
+.control-button-full:hover {
+    background-color: #2980b9;
+}
+
+/* Add this to ensure AR.js elements are properly visible */
+#arjs-video {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    z-index: 1 !important;
+    opacity: 1 !important;
+}
+
+/* Make sure the scene is not hidden */
+.a-scene {
+    visibility: visible !important;
+    z-index: 2 !important;
+}
+
+/* Make sure our AR scene is properly displayed when visible */
+#ar-scene.hidden {
+    display: none !important;
+}
+
+#ar-scene:not(.hidden) {
+    display: block !important;
+    visibility: visible !important;
+    z-index: 2 !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Debug video for testing */
+#debug-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+}
+
+/* Add these new styles for surface detection and AR integration */
+
+/* Surface detection guide */
+#debug-plane {
+    pointer-events: none;
+    animation: pulse-detection 2s infinite ease-in-out;
+}
+
+@keyframes pulse-detection {
+    0% { opacity: 0.2; }
+    50% { opacity: 0.5; }
+    100% { opacity: 0.2; }
+}
+
+/* Camera feed container */
+#camera-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    overflow: hidden;
+}
+
+/* Debug indicator for surface detection */
+.surface-detection-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 140px;
+    height: 140px;
+    border: 6px solid #3498db;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1001;
+    opacity: 0.9;
+    background-color: rgba(52, 152, 219, 0.15);
+    animation: pulse-indicator 2s infinite ease-in-out;
+    box-shadow: 0 0 30px rgba(52, 152, 219, 0.6);
+    transition: all 0.3s ease;
+}
+
+.surface-detection-indicator::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 12px;
+    background-color: #3498db;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(52, 152, 219, 1);
+}
+
+@keyframes pulse-indicator {
+    0% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.95); }
+    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+    100% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.95); }
+}
+
+/* Debug camera feed when AR.js fails */
+#debug-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+    transform: scaleX(-1); /* Flip horizontally to match AR.js camera */
+}
+
+/* Make sure AR.js camera video is always visible */
+#arjs-video {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    z-index: 2 !important;
+    opacity: 1 !important;
+}
+
+/* Enhanced AR scene visibility */
+.a-scene {
+    visibility: visible !important;
+    z-index: 3 !important;
+    pointer-events: auto !important;
+}
+
+/* Explicitly show the canvas at the right z-index */
+.a-canvas {
+    z-index: 3 !important;
+    pointer-events: auto !important;
+}
+
+/* Ensure AR scene is properly displayed when visible */
+#ar-scene.hidden {
+    display: none !important;
+}
+
+#ar-scene:not(.hidden) {
+    display: block !important;
+    visibility: visible !important;
+    z-index: 3 !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    pointer-events: auto !important;
+}
+
+/* Fix for AR.js gltf model rendering */
+.a-entity[gltf-model] {
+    z-index: 5 !important;
+    pointer-events: auto !important;
+}
+
+/* Add styles for the tap instruction */
+.tap-instruction {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 25px;
+    padding: 15px 25px;
+    background-color: #3498db;
+    color: white;
+    border-radius: 40px;
+    font-weight: bold;
+    font-size: 16px;
+    animation: pulse-tap 2s infinite ease-in-out;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    z-index: 1002;
+}
+
+.tap-instruction i {
+    margin-right: 12px;
+    font-size: 1.3em;
+    animation: tap-bounce 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-tap {
+    0% { transform: scale(1); background-color: #3498db; }
+    50% { transform: scale(1.05); background-color: #2980b9; }
+    100% { transform: scale(1); background-color: #3498db; }
+}
+
+@keyframes tap-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+/* Touch overlay for model placement */
+#touch-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 990; /* Above camera feed but below UI */
+    background-color: transparent;
+    pointer-events: none; /* Start disabled until surface detected */
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+#touch-overlay.active {
+    pointer-events: auto;
+}
+
+/* Placement instructions styles */
+.placement-instructions {
+    position: fixed;
+    bottom: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(52, 152, 219, 0.9);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 40px;
+    font-weight: bold;
+    font-size: 18px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    z-index: 1002;
+    animation: pulse-instruction 2s infinite ease-in-out;
+    pointer-events: none;
+}
+
+.placement-instructions i {
+    margin-right: 12px;
+    font-size: 1.2em;
+    animation: tap-bounce 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-instruction {
+    0% { transform: translateX(-50%) scale(1); background-color: rgba(52, 152, 219, 0.9); }
+    50% { transform: translateX(-50%) scale(1.05); background-color: rgba(41, 128, 185, 0.9); }
+    100% { transform: translateX(-50%) scale(1); background-color: rgba(52, 152, 219, 0.9); }
+}
+
+/* Improved touch overlay for model placement */
+#touch-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 990; /* Above camera feed but below UI */
+    background-color: transparent;
+    pointer-events: none; /* Start disabled until ready */
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+#touch-overlay.active {
+    pointer-events: auto;
+}
+
+/* Ensure proper layering */
+#camera-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    overflow: hidden;
+}
+
+#arjs-video {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    z-index: 2 !important;
+    opacity: 1 !important;
+}
+
+/* Make sure AR.js scene is visible */
+#ar-scene {
+    z-index: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.a-canvas {
+    z-index: 1 !important;
+}
+
+/* Placement prompt styling */
+#placement-prompt {
+    position: fixed;
+    bottom: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5000 !important;
+    pointer-events: none;
+    display: block !important; /* Force display */
+    opacity: 1 !important; /* Force visibility */
+}
+
+.prompt-content {
+    background-color: rgba(52, 152, 219, 0.9);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 30px;
+    font-size: 18px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    animation: pulse-prompt 2s infinite ease-in-out;
+    white-space: nowrap;
+    border: 2px solid white;
+}
+
+.prompt-content i {
+    margin-right: 10px;
+    animation: tap-bounce 1.5s infinite ease-in-out;
+    font-size: 20px;
+}
+
+@keyframes pulse-prompt {
+    0% { transform: scale(1); background-color: rgba(52, 152, 219, 0.9); }
+    50% { transform: scale(1.05); background-color: rgba(41, 128, 185, 0.9); }
+    100% { transform: scale(1); background-color: rgba(52, 152, 219, 0.9); }
+}
+
+@keyframes tap-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+/* Simple controls */
+#simple-controls {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 999;
+}
+
+.control-button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: rgba(52, 152, 219, 0.9);
+    color: white;
+    border: none;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.control-button:active {
+    transform: scale(0.95);
+    background-color: rgba(41, 128, 185, 0.9);
+}
+
+/* Touch overlay */
+#touch-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 990;
+    background-color: transparent;
+    pointer-events: auto;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Notification */
+#notification {
+    position: fixed;
+    top: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    font-size: 16px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 9999;
+    text-align: center;
+    max-width: 80%;
+    pointer-events: none;
+    border: 2px solid #3498db;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+#notification.show {
+    opacity: 1;
+}
+
+/* General utility classes */
+.hidden {
+    display: none !important;
+}
+
+/* Model Controls Panel - Make sure it's visible */
+#model-controls-panel {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+    z-index: 9999;
+    width: 300px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transform: translateY(calc(100% - 50px));
+    transition: transform 0.3s ease;
+}
+
+#model-controls-panel.expanded {
+    transform: translateY(0);
+}
+
+#model-controls-panel .panel-header {
+    padding: 10px 15px;
+    background-color: rgba(52, 152, 219, 0.6);
+    border-radius: 10px 10px 0 0;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#model-controls-panel .panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+#model-controls-panel .toggle-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+#model-controls-panel.expanded .toggle-button i {
+    transform: rotate(180deg);
+}
+
+#model-controls-panel .panel-content {
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#model-controls-panel .control-group {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 15px;
+}
+
+#model-controls-panel .control-group:last-child {
+    border-bottom: none;
+}
+
+#model-controls-panel .control-label {
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+#model-controls-panel .control-label-small {
+    width: 25px;
+    font-size: 14px;
+    text-align: right;
+}
+
+#model-controls-panel .control-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+#model-controls-panel .slider {
+    flex: 1;
+    height: 5px;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+    border-radius: 5px;
+}
+
+#model-controls-panel .slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    background: #3498db;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+#model-controls-panel .slider::-moz-range-thumb {
+    width: 15px;
+    height: 15px;
+    background: #3498db;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+#model-controls-panel .value-display {
+    width: 35px;
+    font-size: 14px;
+    text-align: right;
+}
+
+#model-controls-panel .control-button-full {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+    text-align: center;
+}
+
+#model-controls-panel .control-button-full:hover {
+    background-color: #2980b9;
+}
+
+/* Floating Control Button */
+.floating-control-button {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background-color: #3498db;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 24px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    z-index: 9999;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.floating-control-button:hover {
+    transform: scale(1.1);
+    background-color: #2980b9;
+}
+
+.floating-control-button:active {
+    transform: scale(0.95);
 }

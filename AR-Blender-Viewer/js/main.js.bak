@@ -1,0 +1,563 @@
+/**
+ * Main Application Logic for AR Blender Model Viewer
+ * Initializes the AR experience and handles core functionality
+ */
+
+// Main Application Namespace
+const ARApp = {
+    // Config
+    config: {
+        initialModelPath: './models/model.glb',
+        defaultDelay: 3000,
+        zoomMin: 0.5,
+        zoomMax: 3.0,
+        zoomStep: 0.2
+    },
+    
+    // State
+    state: {
+        isInitialized: false,
+        isARReady: false,
+        activeControl: null,
+        zoomLevel: 1.0,
+        orientation360Enabled: false
+    },
+    
+    // UI Elements (will be populated during init)
+    ui: {
+        loadingScreen: null,
+        errorMessage: null,
+        controlPanel: null,
+        modelSelectionModal: null,
+        controls: {} // will contain all control buttons
+    },
+    
+    // Model data
+    models: [
+        { name: 'Default Model', path: './models/model.glb', thumbnail: 'default-model' },
+        { name: 'Cube', path: './models/cube.glb', thumbnail: 'default-model' },
+        { name: 'Robot', path: './models/robot.glb', thumbnail: 'default-model' }
+    ],
+    
+    // Guaranteed safe initialization
+    init: function() {
+        // Wait for page to be fully loaded
+        if (document.readyState !== 'complete') {
+            console.log('Waiting for page to fully load...');
+            window.addEventListener('load', this.init.bind(this));
+            return;
+        }
+        
+        console.log('Initializing AR Blender Viewer...');
+        
+        try {
+            // Prevent double initialization
+            if (this.state.isInitialized) {
+                console.log('Already initialized, skipping...');
+                return;
+            }
+            
+            // Mark as initialized
+            this.state.isInitialized = true;
+            
+            // Cache all UI elements
+            this.cacheUIElements();
+            
+            // Initialize UI Manager if it exists
+            if (typeof UIManager !== 'undefined' && UIManager) {
+                try {
+                    UIManager.init();
+                    console.log('UI Manager initialized');
+                } catch (e) {
+                    console.error('Error initializing UI Manager:', e);
+                }
+            }
+            
+            // Set up all event listeners
+            this.setupEventListeners();
+            
+            // Initialize model selection
+            this.setupModelSelection();
+            
+            // Set up viewport controls
+            this.setupViewportControls();
+            
+            // Initialize 360 view functionality
+            this.setup360View();
+            
+            // Hide loading screen after delay
+            setTimeout(() => {
+                this.hideLoadingScreen();
+            }, this.config.defaultDelay);
+            
+            console.log('AR Blender Viewer initialized successfully!');
+            
+            // Show UI elements once everything is ready
+            document.body.classList.add('ready');
+            
+            // Show control panel
+            if (this.ui.controlPanel) {
+                this.ui.controlPanel.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Error initializing AR Blender Viewer:', error);
+            this.showError('Failed to initialize AR Blender Viewer: ' + error.message);
+        }
+    },
+    
+    // Cache all UI elements
+    cacheUIElements: function() {
+        console.log('Caching UI elements...');
+        
+        // Main elements
+        this.ui.loadingScreen = document.getElementById('loading-screen');
+        this.ui.errorMessage = document.getElementById('error-message');
+        this.ui.controlPanel = document.getElementById('control-panel');
+        this.ui.modelSelectionModal = document.getElementById('model-selection-modal');
+        this.ui.placementIndicator = document.getElementById('placement-indicator');
+        
+        // Control buttons - using query selector to get all at once
+        const controlButtons = document.querySelectorAll('.control-button');
+        if (controlButtons && controlButtons.length > 0) {
+            // Convert to array and create a map by ID for easy access
+            Array.from(controlButtons).forEach(button => {
+                if (button && button.id) {
+                    this.ui.controls[button.id] = button;
+                }
+            });
+            console.log('Found control buttons:', Object.keys(this.ui.controls).length);
+        } else {
+            console.warn('No control buttons found in the DOM');
+        }
+        
+        // Model selection elements
+        this.ui.modelPresetGrid = document.getElementById('model-preset-grid');
+        this.ui.modelUpload = document.getElementById('model-upload');
+        this.ui.closeModelSelection = document.getElementById('close-model-selection');
+        
+        // Viewport control buttons
+        this.ui.zoomInButton = document.getElementById('zoom-in-button');
+        this.ui.zoomOutButton = document.getElementById('zoom-out-button');
+        this.ui.centerViewButton = document.getElementById('center-view-button');
+        
+        // A-Frame scene
+        this.ui.scene = document.querySelector('a-scene');
+        this.ui.modelEntity = document.querySelector('#model');
+        this.ui.modelContainer = document.querySelector('#model-container');
+    },
+    
+    // Set up all event listeners
+    setupEventListeners: function() {
+        console.log('Setting up event listeners...');
+        
+        try {
+            // Safely add click listeners to all control buttons
+            Object.keys(this.ui.controls).forEach(id => {
+                const button = this.ui.controls[id];
+                if (!button) return;
+                
+                console.log('Adding click listener to:', id);
+                
+                // Using the safer technique to add event listeners
+                this.addSafeEventListener(button, 'click', () => {
+                    console.log('Button clicked:', id);
+                    
+                    // Toggle active state for the button
+                    if (id !== 'model-button' && id !== 'reset-button') {
+                        this.setActiveControl(button);
+                    }
+                    
+                    // Handle button actions
+                    switch(id) {
+                        case 'place-button':
+                            this.setControlMode('place');
+                            break;
+                        case 'rotate-button':
+                            this.setControlMode('rotate');
+                            break;
+                        case 'scale-button':
+                            this.setControlMode('scale');
+                            break;
+                        case 'pan-button':
+                            this.setControlMode('pan');
+                            break;
+                        case 'view360-button':
+                            this.toggle360View();
+                            break;
+                        case 'reset-button':
+                            this.resetModel();
+                            break;
+                        case 'model-button':
+                            this.showModelSelectionModal();
+                            break;
+                    }
+                });
+            });
+            
+            // Window resize handler
+            this.addSafeEventListener(window, 'resize', () => {
+                console.log('Window resized');
+                // Make any adjustments needed on resize
+            });
+            
+            // A-Frame scene event listeners
+            if (this.ui.scene) {
+                this.addSafeEventListener(this.ui.scene, 'loaded', () => {
+                    console.log('A-Frame scene loaded');
+                    this.showNotification('AR scene loaded successfully');
+                });
+                
+                this.addSafeEventListener(this.ui.scene, 'renderstart', () => {
+                    console.log('A-Frame render started');
+                });
+            } else {
+                console.warn('A-Frame scene not found in DOM');
+            }
+            
+            console.log('Event listeners setup completed');
+        } catch (error) {
+            console.error('Error setting up event listeners:', error);
+        }
+    },
+    
+    // Helper method to safely add event listeners
+    addSafeEventListener: function(element, eventType, callback) {
+        if (!element) {
+            console.warn(`Cannot add ${eventType} listener to undefined element`);
+            return false;
+        }
+        
+        try {
+            element.addEventListener(eventType, callback);
+            return true;
+        } catch (error) {
+            console.error(`Error adding ${eventType} listener:`, error);
+            return false;
+        }
+    },
+    
+    // Set active control
+    setActiveControl: function(button) {
+        if (!button) return;
+        
+        // Remove active class from all buttons
+        Object.values(this.ui.controls).forEach(btn => {
+            if (btn && btn.classList) {
+                btn.classList.remove('active');
+            }
+        });
+        
+        // Add active class to the selected button
+        button.classList.add('active');
+        
+        // Update active control
+        this.state.activeControl = button.id;
+    },
+    
+    // Set control mode
+    setControlMode: function(mode) {
+        console.log('Setting control mode to:', mode);
+        
+        // Update model controls via event
+        try {
+            window.dispatchEvent(new CustomEvent('model-interaction-mode', { 
+                detail: { mode: mode }
+            }));
+        } catch (e) {
+            console.error('Error dispatching model-interaction-mode event:', e);
+        }
+        
+        // Show placement indicator if in place mode
+        if (mode === 'place') {
+            this.showPlacementIndicator();
+        } else {
+            this.hidePlacementIndicator();
+        }
+        
+        // Notify UIManager if it exists
+        if (typeof UIManager !== 'undefined' && UIManager && UIManager.setControlModeActive) {
+            UIManager.setControlModeActive(mode);
+        }
+    },
+    
+    // Show error message
+    showError: function(message) {
+        console.error('ERROR:', message);
+        
+        if (this.ui.errorMessage) {
+            const errorDescription = this.ui.errorMessage.querySelector('.error-description');
+            if (errorDescription) {
+                errorDescription.textContent = message;
+            }
+            this.ui.errorMessage.classList.remove('hidden');
+        } else {
+            alert('Error: ' + message);
+        }
+    },
+    
+    // Show notification
+    showNotification: function(message) {
+        console.log('NOTIFICATION:', message);
+        
+        if (typeof UIManager !== 'undefined' && UIManager && UIManager.showNotification) {
+            UIManager.showNotification(message);
+        } else {
+            // Fallback notification
+            const notification = document.getElementById('notification');
+            if (notification) {
+                notification.textContent = message;
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+        }
+    },
+    
+    // Hide loading screen
+    hideLoadingScreen: function() {
+        if (this.ui.loadingScreen) {
+            this.ui.loadingScreen.classList.add('hidden');
+        }
+    },
+    
+    // Show placement indicator
+    showPlacementIndicator: function() {
+        if (this.ui.placementIndicator) {
+            this.ui.placementIndicator.classList.remove('hidden');
+        }
+        
+        if (typeof UIManager !== 'undefined' && UIManager && UIManager.showPlacementIndicator) {
+            UIManager.showPlacementIndicator();
+        }
+    },
+    
+    // Hide placement indicator
+    hidePlacementIndicator: function() {
+        if (this.ui.placementIndicator) {
+            this.ui.placementIndicator.classList.add('hidden');
+        }
+        
+        if (typeof UIManager !== 'undefined' && UIManager && UIManager.hidePlacementIndicator) {
+            UIManager.hidePlacementIndicator();
+        }
+    },
+    
+    // Reset model to default position, rotation, and scale
+    resetModel: function() {
+        console.log('Resetting model');
+        
+        if (this.ui.modelContainer) {
+            this.ui.modelContainer.setAttribute('position', '0 0 -3');
+            this.ui.modelContainer.setAttribute('rotation', '0 0 0');
+            this.ui.modelContainer.setAttribute('scale', '1 1 1');
+        }
+        
+        if (typeof UIManager !== 'undefined' && UIManager && UIManager.resetModel) {
+            UIManager.resetModel();
+        }
+        
+        this.showNotification('Model reset');
+    },
+    
+    // Setup model selection
+    setupModelSelection: function() {
+        // Setup close button for model selection modal
+        if (this.ui.closeModelSelection) {
+            this.addSafeEventListener(this.ui.closeModelSelection, 'click', () => {
+                this.hideModelSelectionModal();
+            });
+        }
+        
+        // Handle model upload
+        if (this.ui.modelUpload) {
+            this.addSafeEventListener(this.ui.modelUpload, 'change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    this.handleModelUpload(file);
+                }
+            });
+        }
+        
+        // Populate preset models grid
+        this.populateModelGrid();
+    },
+    
+    // Show model selection modal
+    showModelSelectionModal: function() {
+        console.log('Showing model selection modal');
+        
+        if (this.ui.modelSelectionModal) {
+            this.ui.modelSelectionModal.classList.remove('hidden');
+        }
+    },
+    
+    // Hide model selection modal
+    hideModelSelectionModal: function() {
+        console.log('Hiding model selection modal');
+        
+        if (this.ui.modelSelectionModal) {
+            this.ui.modelSelectionModal.classList.add('hidden');
+        }
+    },
+    
+    // Populate the model grid with available models
+    populateModelGrid: function() {
+        if (!this.ui.modelPresetGrid) return;
+        
+        console.log('Populating model grid');
+        
+        // Clear existing content
+        this.ui.modelPresetGrid.innerHTML = '';
+        
+        // Add each model to the grid
+        this.models.forEach(model => {
+            const modelElement = document.createElement('div');
+            modelElement.className = 'model-preset';
+            modelElement.dataset.model = model.path;
+            
+            const thumbnail = document.createElement('div');
+            thumbnail.className = 'model-thumbnail ' + model.thumbnail;
+            
+            const name = document.createElement('div');
+            name.className = 'model-name';
+            name.textContent = model.name;
+            
+            modelElement.appendChild(thumbnail);
+            modelElement.appendChild(name);
+            
+            // Add click handler
+            this.addSafeEventListener(modelElement, 'click', () => {
+                this.changeModel(model.path);
+                this.hideModelSelectionModal();
+            });
+            
+            this.ui.modelPresetGrid.appendChild(modelElement);
+        });
+    },
+    
+    // Change the current model
+    changeModel: function(modelPath) {
+        console.log('Changing model to:', modelPath);
+        
+        if (this.ui.modelEntity) {
+            this.ui.modelEntity.setAttribute('gltf-model', modelPath);
+            this.showNotification('Model changed');
+        }
+    },
+    
+    // Handle model upload
+    handleModelUpload: function(file) {
+        console.log('Handling model upload:', file.name);
+        
+        // Create object URL for the uploaded model
+        const objectURL = URL.createObjectURL(file);
+        
+        // Change the model to the uploaded file
+        this.changeModel(objectURL);
+        this.hideModelSelectionModal();
+    },
+    
+    // Setup viewport controls
+    setupViewportControls: function() {
+        // Zoom in button
+        if (this.ui.zoomInButton) {
+            this.addSafeEventListener(this.ui.zoomInButton, 'click', () => {
+                this.zoomViewport(this.config.zoomStep);
+            });
+        }
+        
+        // Zoom out button
+        if (this.ui.zoomOutButton) {
+            this.addSafeEventListener(this.ui.zoomOutButton, 'click', () => {
+                this.zoomViewport(-this.config.zoomStep);
+            });
+        }
+        
+        // Center view button
+        if (this.ui.centerViewButton) {
+            this.addSafeEventListener(this.ui.centerViewButton, 'click', () => {
+                this.centerView();
+            });
+        }
+    },
+    
+    // Zoom viewport
+    zoomViewport: function(zoomDelta) {
+        this.state.zoomLevel = Math.max(
+            this.config.zoomMin, 
+            Math.min(this.config.zoomMax, this.state.zoomLevel + zoomDelta)
+        );
+        
+        console.log('Zooming viewport to:', this.state.zoomLevel);
+        
+        if (this.ui.modelContainer) {
+            const currentScale = this.ui.modelContainer.getAttribute('scale');
+            const newScale = this.state.zoomLevel;
+            
+            this.ui.modelContainer.setAttribute('scale', `${newScale} ${newScale} ${newScale}`);
+        }
+    },
+    
+    // Center the view
+    centerView: function() {
+        console.log('Centering view');
+        
+        if (this.ui.modelContainer) {
+            this.ui.modelContainer.setAttribute('position', '0 0 -3');
+        }
+    },
+    
+    // Setup 360 view
+    setup360View: function() {
+        console.log('Setting up 360 view capability');
+        
+        // Implement 360 view functionality if needed
+    },
+    
+    // Toggle 360 view
+    toggle360View: function() {
+        this.state.orientation360Enabled = !this.state.orientation360Enabled;
+        console.log('360 view toggled:', this.state.orientation360Enabled);
+        
+        if (this.state.orientation360Enabled) {
+            this.enable360View();
+        } else {
+            this.disable360View();
+        }
+    },
+    
+    // Enable 360 view
+    enable360View: function() {
+        if (this.ui.controls['view360-button']) {
+            this.ui.controls['view360-button'].classList.add('active');
+        }
+        
+        // Code to enable 360 view functionality
+    },
+    
+    // Disable 360 view
+    disable360View: function() {
+        if (this.ui.controls['view360-button']) {
+            this.ui.controls['view360-button'].classList.remove('active');
+        }
+        
+        // Code to disable 360 view functionality
+    }
+};
+
+// Auto-initialize when script is loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        // Short delay to ensure all resources are loaded
+        setTimeout(function() {
+            ARApp.init();
+        }, 500);
+    });
+} else {
+    // DOM already loaded, initialize with delay
+    setTimeout(function() {
+        ARApp.init();
+    }, 500);
+}

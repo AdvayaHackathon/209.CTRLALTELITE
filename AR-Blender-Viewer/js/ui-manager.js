@@ -1,142 +1,187 @@
 /**
  * UI Manager for AR Blender Model Viewer
- * Handles all UI interactions, status updates, and user controls
+ * Handles all UI interactions, status updates, and notifications
  */
 
 const UIManager = {
-    // UI elements
-    elements: {
-        loadingScreen: null,
-        controlPanel: null,
-        placementIndicator: null,
-        arStatus: null,
-        statusDot: null,
-        statusText: null,
-        modelSelectionModal: null,
-        closeModelSelection: null,
-        helpButton: null,
-        helpModal: null,
-        errorMessage: null,
-        notification: null,
-        permissionsRequest: null,
-        viewportControls: null,
-        cameraPermissionButton: null,
-    },
+    // UI elements references
+    elements: {},
     
-    // Control buttons
-    controlButtons: {
-        placeButton: null,
-        rotateButton: null,
-        scaleButton: null,
-        panButton: null,
-        resetButton: null,
-        modelButton: null,
-        view360Button: null,
-    },
+    // Initialization state
+    isInitialized: false,
     
-    // Viewport control buttons
-    viewportControlButtons: {
-        zoomInButton: null,
-        zoomOutButton: null,
-        centerViewButton: null,
-    },
-    
-    // Modal states
-    modalStates: {
-        isModelSelectionVisible: false,
-        isHelpVisible: false,
-    },
-    
-    // Initialize UI
+    // Initialize UI Manager
     init: function() {
+        // Prevent double initialization
+        if (this.isInitialized) {
+            console.log('UI Manager already initialized');
+            return this;
+        }
+        
         console.log('Initializing UI Manager');
         
-        this.cacheElements();
-        this.setupEventListeners();
-        this.updateARStatus('Initializing...');
-        
-        // Start with loading screen visible
-        if (this.elements.loadingScreen) {
-            this.elements.loadingScreen.classList.remove('hidden');
+        try {
+            // Cache DOM elements
+            this.cacheElements();
+            
+            // Setup event listeners
+            this.setupEventListeners();
+            
+            // Update AR status
+            this.updateARStatus('Initializing camera...');
+            
+            // Mark as initialized
+            this.isInitialized = true;
+            
+            return this;
+        } catch (error) {
+            console.error('Error initializing UI Manager:', error);
+            this.showError('Failed to initialize UI. Please refresh the page.');
+            return this;
         }
-        
-        return this;
     },
     
-    // Cache DOM elements
+    // Cache all UI elements for quick access
     cacheElements: function() {
-        this.elements.loadingScreen = document.getElementById('loading-screen');
-        this.elements.controlPanel = document.getElementById('control-panel');
-        this.elements.placementIndicator = document.getElementById('placement-indicator');
-        this.elements.arStatus = document.getElementById('ar-status');
-        this.elements.statusDot = this.elements.arStatus ? this.elements.arStatus.querySelector('.status-dot') : null;
-        this.elements.statusText = this.elements.arStatus ? this.elements.arStatus.querySelector('.status-text') : null;
-        this.elements.modelSelectionModal = document.getElementById('model-selection-modal');
-        this.elements.closeModelSelection = document.getElementById('close-model-selection');
-        this.elements.helpButton = document.getElementById('help-button');
-        this.elements.helpModal = document.getElementById('help-modal');
-        this.elements.errorMessage = document.getElementById('error-message');
-        this.elements.notification = document.getElementById('notification');
-        this.elements.permissionsRequest = document.getElementById('permissions-request');
-        this.elements.viewportControls = document.getElementById('viewport-controls');
-        this.elements.cameraPermissionButton = document.getElementById('camera-permission-button');
+        console.log('Caching UI elements');
         
-        // Cache control buttons
-        this.controlButtons.placeButton = document.getElementById('place-button');
-        this.controlButtons.rotateButton = document.getElementById('rotate-button');
-        this.controlButtons.scaleButton = document.getElementById('scale-button');
-        this.controlButtons.panButton = document.getElementById('pan-button');
-        this.controlButtons.resetButton = document.getElementById('reset-button');
-        this.controlButtons.modelButton = document.getElementById('model-button');
-        this.controlButtons.view360Button = document.getElementById('view360-button');
-        
-        // Cache viewport control buttons
-        this.viewportControlButtons.zoomInButton = document.getElementById('zoom-in-button');
-        this.viewportControlButtons.zoomOutButton = document.getElementById('zoom-out-button');
-        this.viewportControlButtons.centerViewButton = document.getElementById('center-view-button');
+        try {
+            // Core UI elements
+            this.elements.loadingScreen = document.getElementById('loading-screen');
+            this.elements.errorMessage = document.getElementById('error-message');
+            this.elements.controlPanel = document.getElementById('control-panel');
+            this.elements.placementIndicator = document.getElementById('placement-indicator');
+            this.elements.arStatus = document.getElementById('ar-status');
+            this.elements.notification = document.getElementById('notification');
+            
+            // Status elements
+            if (this.elements.arStatus) {
+                this.elements.statusDot = this.elements.arStatus.querySelector('.status-dot');
+                this.elements.statusText = this.elements.arStatus.querySelector('.status-text');
+            }
+            
+            // Model selection modal
+            this.elements.modelSelectionModal = document.getElementById('model-selection-modal');
+            this.elements.closeModelSelection = document.getElementById('close-model-selection');
+            
+            // Help modal
+            this.elements.helpButton = document.getElementById('help-button');
+            this.elements.helpModal = document.getElementById('help-modal');
+            
+            // Permissions
+            this.elements.permissionsRequest = document.getElementById('permissions-request');
+            this.elements.cameraPermissionButton = document.getElementById('camera-permission-button');
+            
+            // Viewport controls
+            this.elements.viewportControls = document.getElementById('viewport-controls');
+            
+            // Log element availability
+            for (const key in this.elements) {
+                if (this.elements[key]) {
+                    console.log(`✓ UI Element found: ${key}`);
+                } else {
+                    console.warn(`✗ UI Element not found: ${key}`);
+                }
+            }
+        } catch (error) {
+            console.error('Error caching UI elements:', error);
+            throw new Error('Failed to cache UI elements: ' + error.message);
+        }
     },
     
-    // Setup event listeners
+    // Setup event listeners for UI elements
     setupEventListeners: function() {
-        // Close buttons for modals
-        if (this.elements.closeModelSelection) {
-            this.elements.closeModelSelection.addEventListener('click', () => this.hideModelSelectionModal());
-        }
+        console.log('Setting up UI event listeners');
         
-        if (this.elements.helpButton) {
-            this.elements.helpButton.addEventListener('click', () => this.toggleHelpModal());
-        }
-        
-        if (this.elements.helpModal) {
-            const closeButtons = this.elements.helpModal.querySelectorAll('.close-button');
-            closeButtons.forEach(button => {
-                button.addEventListener('click', () => this.hideHelpModal());
-            });
-        }
-        
-        // Control buttons
-        if (this.controlButtons.modelButton) {
-            this.controlButtons.modelButton.addEventListener('click', () => this.showModelSelectionModal());
-        }
-        
-        // Permissions button
-        const enableMotionButton = document.getElementById('enable-motion-button');
-        if (enableMotionButton) {
-            enableMotionButton.addEventListener('click', () => this.requestPermissions());
-        }
-        
-        // Camera permission button
-        if (this.elements.cameraPermissionButton) {
-            this.elements.cameraPermissionButton.addEventListener('click', () => {
-                console.log('Camera permission button clicked');
-                // This will trigger the ar-scene-manager to request camera permission
-                const scene = document.querySelector('a-scene');
-                if (scene && scene.components['ar-scene-manager']) {
-                    scene.components['ar-scene-manager'].requestCameraPermission();
-                } else {
-                    this.showError('AR scene not initialized. Please refresh the page.');
+        try {
+            // Close buttons for modals
+            this.safeAddEventListener(this.elements.closeModelSelection, 'click', () => this.hideModelSelectionModal());
+            
+            // Help button
+            this.safeAddEventListener(this.elements.helpButton, 'click', () => this.toggleHelpModal());
+            
+            // Help modal close buttons
+            if (this.elements.helpModal) {
+                const closeButtons = this.elements.helpModal.querySelectorAll('.close-button');
+                if (closeButtons && closeButtons.length > 0) {
+                    closeButtons.forEach(button => {
+                        this.safeAddEventListener(button, 'click', () => this.hideHelpModal());
+                    });
                 }
+            }
+            
+            // Permissions button
+            const enableMotionButton = document.getElementById('enable-motion-button');
+            this.safeAddEventListener(enableMotionButton, 'click', () => this.requestPermissions());
+            
+            // Camera permission button
+            this.safeAddEventListener(this.elements.cameraPermissionButton, 'click', () => {
+                console.log('Camera permission button clicked');
+                this.requestCameraPermission();
             });
+            
+            console.log('UI event listeners setup complete');
+        } catch (error) {
+            console.error('Error setting up UI event listeners:', error);
+            throw new Error('Failed to setup event listeners: ' + error.message);
+        }
+    },
+    
+    // Safely add event listener with proper error handling
+    safeAddEventListener: function(element, eventType, callback) {
+        if (!element) {
+            console.warn(`Cannot add ${eventType} listener to undefined element`);
+            return false;
+        }
+        
+        try {
+            element.addEventListener(eventType, callback);
+            return true;
+        } catch (error) {
+            console.error(`Error adding ${eventType} listener:`, error);
+            return false;
+        }
+    },
+    
+    // Request camera permission
+    requestCameraPermission: function() {
+        console.log('Requesting camera permission');
+        
+        try {
+            const scene = document.querySelector('a-scene');
+            if (scene && scene.components && scene.components['ar-scene-manager']) {
+                scene.components['ar-scene-manager'].requestCameraPermission();
+            } else {
+                this.showError('AR scene not initialized. Please refresh the page.');
+            }
+        } catch (error) {
+            console.error('Error requesting camera permission:', error);
+            this.showError('Failed to request camera access: ' + error.message);
+        }
+    },
+    
+    // Request device motion/orientation permissions
+    requestPermissions: function() {
+        console.log('Requesting device motion permissions');
+        
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            DeviceMotionEvent.requestPermission()
+                .then(permissionState => {
+                    if (permissionState === 'granted') {
+                        console.log('Device motion permission granted');
+                        this.hidePermissionsRequest();
+                    } else {
+                        console.warn('Device motion permission denied');
+                        this.showError('Motion sensors permission required for AR experience');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error requesting motion permission:', error);
+                    this.showError('Could not access motion sensors: ' + error.message);
+                });
+        } else {
+            console.log('Device doesn\'t require explicit motion permissions');
+            this.hidePermissionsRequest();
         }
     },
     
@@ -182,47 +227,35 @@ const UIManager = {
         }
     },
     
-    // Update AR status
+    // Update AR status text and indicator
     updateARStatus: function(status) {
         if (this.elements.statusText) {
             this.elements.statusText.textContent = status;
         }
     },
     
-    // Set AR status
+    // Set AR status with option to show error state
     setARStatus: function(status, isError = false) {
+        this.updateARStatus(status);
+        
         if (this.elements.arStatus) {
             if (isError) {
                 this.elements.arStatus.classList.add('error');
-                this.elements.statusDot.classList.add('error');
+                if (this.elements.statusDot) {
+                    this.elements.statusDot.classList.add('error');
+                }
             } else {
                 this.elements.arStatus.classList.remove('error');
-                this.elements.statusDot.classList.remove('error');
-                this.elements.statusDot.classList.add('active');
+                if (this.elements.statusDot) {
+                    this.elements.statusDot.classList.remove('error');
+                }
             }
-            
-            this.updateARStatus(status);
-        }
-    },
-    
-    // Show camera permission UI
-    showCameraPermissionUI: function() {
-        if (this.elements.cameraPermissionButton) {
-            this.elements.cameraPermissionButton.classList.remove('hidden');
-        }
-    },
-    
-    // Hide camera permission UI
-    hideCameraPermissionUI: function() {
-        if (this.elements.cameraPermissionButton) {
-            this.elements.cameraPermissionButton.classList.add('hidden');
         }
     },
     
     // Show model selection modal
     showModelSelectionModal: function() {
         if (this.elements.modelSelectionModal) {
-            this.modalStates.isModelSelectionVisible = true;
             this.elements.modelSelectionModal.classList.remove('hidden');
         }
     },
@@ -230,26 +263,24 @@ const UIManager = {
     // Hide model selection modal
     hideModelSelectionModal: function() {
         if (this.elements.modelSelectionModal) {
-            this.modalStates.isModelSelectionVisible = false;
             this.elements.modelSelectionModal.classList.add('hidden');
         }
     },
     
     // Toggle help modal
     toggleHelpModal: function() {
-        if (this.elements.helpModal) {
-            if (this.modalStates.isHelpVisible) {
-                this.hideHelpModal();
-            } else {
-                this.showHelpModal();
-            }
+        if (!this.elements.helpModal) return;
+        
+        if (this.elements.helpModal.classList.contains('hidden')) {
+            this.elements.helpModal.classList.remove('hidden');
+        } else {
+            this.elements.helpModal.classList.add('hidden');
         }
     },
     
     // Show help modal
     showHelpModal: function() {
         if (this.elements.helpModal) {
-            this.modalStates.isHelpVisible = true;
             this.elements.helpModal.classList.remove('hidden');
         }
     },
@@ -257,64 +288,7 @@ const UIManager = {
     // Hide help modal
     hideHelpModal: function() {
         if (this.elements.helpModal) {
-            this.modalStates.isHelpVisible = false;
             this.elements.helpModal.classList.add('hidden');
-        }
-    },
-    
-    // Show error message
-    showError: function(message, title = 'Something went wrong') {
-        if (this.elements.errorMessage) {
-            const errorTitle = this.elements.errorMessage.querySelector('.error-title');
-            const errorDescription = this.elements.errorMessage.querySelector('.error-description');
-            
-            if (errorTitle) errorTitle.textContent = title;
-            if (errorDescription) errorDescription.textContent = message;
-            
-            this.elements.errorMessage.classList.remove('hidden');
-            
-            // Also show a notification
-            this.showNotification(message, 'error');
-            
-            // Update AR status
-            this.setARStatus('Error: ' + message, true);
-        } else {
-            console.error('Error:', message);
-        }
-    },
-    
-    // Hide error message
-    hideError: function() {
-        if (this.elements.errorMessage) {
-            this.elements.errorMessage.classList.add('hidden');
-        }
-    },
-    
-    // Show notification
-    showNotification: function(message, type = 'info') {
-        if (this.elements.notification) {
-            // Clear any existing notification
-            clearTimeout(this.notificationTimeout);
-            
-            // Set notification text and type
-            this.elements.notification.textContent = message;
-            this.elements.notification.className = 'notification'; // Reset classes
-            this.elements.notification.classList.add(type);
-            
-            // Show notification
-            this.elements.notification.classList.add('visible');
-            
-            // Auto hide after 3 seconds
-            this.notificationTimeout = setTimeout(() => {
-                this.hideNotification();
-            }, 3000);
-        }
-    },
-    
-    // Hide notification
-    hideNotification: function() {
-        if (this.elements.notification) {
-            this.elements.notification.classList.remove('visible');
         }
     },
     
@@ -332,162 +306,72 @@ const UIManager = {
         }
     },
     
-    // Request permissions
-    requestPermissions: function() {
-        console.log('Requesting device motion and camera permissions');
+    // Show error message
+    showError: function(message) {
+        console.error('UI ERROR:', message);
         
-        // Request DeviceOrientationEvent permission
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            DeviceOrientationEvent.requestPermission()
-                .then(permission => {
-                    if (permission === 'granted') {
-                        console.log('Device orientation permission granted');
-                        this.showNotification('Device orientation enabled');
-                        
-                        // Also request camera permission
-                        this.requestCameraPermission();
-                    } else {
-                        console.error('Device orientation permission denied');
-                        this.showError('Device orientation permission denied. Some features may not work properly.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error requesting device orientation permission:', error);
-                    this.showError('Failed to request device orientation permission. Please check your browser settings.');
-                })
-                .finally(() => {
-                    this.hidePermissionsRequest();
-                });
+        if (this.elements.errorMessage) {
+            const errorDescription = this.elements.errorMessage.querySelector('.error-description');
+            if (errorDescription) {
+                errorDescription.textContent = message;
+            }
+            this.elements.errorMessage.classList.remove('hidden');
         } else {
-            // DeviceOrientationEvent doesn't require permission on this device/browser
-            console.log('Device orientation permission not required on this device/browser');
+            // Fallback to alert if error element not found
+            alert('Error: ' + message);
+        }
+    },
+    
+    // Show notification
+    showNotification: function(message, duration = 3000) {
+        console.log('NOTIFICATION:', message);
+        
+        if (this.elements.notification) {
+            this.elements.notification.textContent = message;
+            this.elements.notification.classList.add('show');
             
-            // Request camera permission instead
-            this.requestCameraPermission();
-            this.hidePermissionsRequest();
+            setTimeout(() => {
+                this.elements.notification.classList.remove('show');
+            }, duration);
         }
     },
     
-    // Request camera permission
-    requestCameraPermission: function() {
-        console.log('Requesting camera permission');
-        
-        // Show UI element for camera permission
-        this.showCameraPermissionUI();
-        
-        // Trigger AR.js camera permission request
-        const scene = document.querySelector('a-scene');
-        if (scene && scene.components['ar-scene-manager']) {
-            scene.components['ar-scene-manager'].requestCameraPermission();
-        } else {
-            this.showError('AR scene not initialized. Please refresh the page.');
-        }
-    },
-    
-    // Set control mode active
+    // Set active control mode
     setControlModeActive: function(mode) {
-        // Reset all control buttons
-        Object.values(this.controlButtons).forEach(button => {
-            if (button) button.classList.remove('active');
+        console.log('Setting control mode:', mode);
+        
+        // Find all control buttons
+        const controlButtons = document.querySelectorAll('.control-button');
+        
+        // Remove active class from all buttons
+        controlButtons.forEach(button => {
+            button.classList.remove('active');
         });
         
-        // Set active mode
-        switch (mode) {
-            case 'place':
-                if (this.controlButtons.placeButton) this.controlButtons.placeButton.classList.add('active');
-                break;
-            case 'rotate':
-                if (this.controlButtons.rotateButton) this.controlButtons.rotateButton.classList.add('active');
-                break;
-            case 'scale':
-                if (this.controlButtons.scaleButton) this.controlButtons.scaleButton.classList.add('active');
-                break;
-            case 'pan':
-                if (this.controlButtons.panButton) this.controlButtons.panButton.classList.add('active');
-                break;
-            case 'view360':
-                if (this.controlButtons.view360Button) this.controlButtons.view360Button.classList.add('active');
-                break;
-            default:
-                break;
+        // Add active class to the selected mode button
+        const modeButton = document.getElementById(`${mode}-button`);
+        if (modeButton) {
+            modeButton.classList.add('active');
         }
     },
     
-    // Reset model to default position and size
+    // Reset model to default position/rotation/scale
     resetModel: function() {
-        console.log('Resetting model to default position and size');
+        console.log('Resetting model');
         
-        // Get the model container
         const modelContainer = document.getElementById('model-container');
-        
         if (modelContainer) {
-            // Reset position, rotation, and scale
             modelContainer.setAttribute('position', '0 0 -3');
             modelContainer.setAttribute('rotation', '0 0 0');
             modelContainer.setAttribute('scale', '1 1 1');
-            
-            // Show notification
-            this.showNotification('Model reset to default position and size');
-        } else {
-            console.error('Model container not found');
-            this.showError('Failed to reset model - container not found');
-        }
-    },
-    
-    // Load model
-    loadModel: function(modelPath, modelName) {
-        console.log('Loading model:', modelPath);
-        
-        if (!modelPath) {
-            this.showError('Invalid model path');
-            return;
         }
         
-        // Get model asset and entity
-        const modelAsset = document.getElementById('model-asset');
-        const model = document.getElementById('model');
-        
-        if (modelAsset && model) {
-            // Show loading notification
-            this.showNotification(`Loading model: ${modelName || 'custom model'}...`);
-            
-            // Set asset source
-            modelAsset.setAttribute('src', modelPath);
-            
-            // Clear current model
-            model.removeAttribute('gltf-model');
-            
-            // Wait for asset to load
-            modelAsset.addEventListener('loaded', () => {
-                // Apply model to entity
-                model.setAttribute('gltf-model', '#model-asset');
-                this.showNotification(`Model loaded: ${modelName || 'custom model'}`);
-                this.hideModelSelectionModal();
-                
-                // Reset model position and scale
-                this.resetModel();
-            }, { once: true });
-            
-            // Handle load errors
-            modelAsset.addEventListener('error', (error) => {
-                console.error('Error loading model:', error);
-                this.showError(`Failed to load model: ${error.message || 'Unknown error'}`);
-            }, { once: true });
-        } else {
-            this.showError('Model elements not found');
-        }
+        this.showNotification('Model reset');
     }
 };
 
-// Export the UI Manager for module use
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = UIManager;
+// Auto-initialize if window is already loaded
+if (document.readyState === 'complete') {
+    console.log('Document already loaded, initializing UI Manager');
+    UIManager.init();
 }
-
-// Initialize UI Manager when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // Delay initialization slightly to ensure all elements are available
-    setTimeout(() => {
-        UIManager.init();
-    }, 100);
-});

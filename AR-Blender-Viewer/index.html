@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Blender Model Viewer</title>
-    <meta name="description" content="View your Blender 3D models in Augmented Reality">
+    <title>TimeScape Explorer - Nalanda</title>
+    <meta name="description" content="Explore historical locations in augmented reality">
     <meta name="theme-color" content="#3498db">
     
     <!-- Favicon -->
@@ -18,6 +18,24 @@
     
     <!-- A-Frame and AR.js -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script>
+        // Handle A-Frame loading errors
+        AFRAME.registerComponent('scene-error-handler', {
+            init: function() {
+                this.el.addEventListener('error', function(evt) {
+                    console.error('A-Frame scene error:', evt.detail);
+                    const errorMessage = document.getElementById('error-message');
+                    if (errorMessage) {
+                        const errorDescription = errorMessage.querySelector('.error-description');
+                        if (errorDescription) {
+                            errorDescription.textContent = 'Failed to initialize AR scene. Please check camera permissions and try again.';
+                        }
+                        errorMessage.classList.remove('hidden');
+                    }
+                });
+            }
+        });
+    </script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
     
@@ -25,237 +43,1703 @@
     <script src="./js/ar-components.js"></script>
     <script src="./js/ui-manager.js"></script>
     <script src="./js/main.js"></script>
+    <script src="./js/model-controls.js"></script>
+    <script src="./js/timescape.js"></script>
+    
+    <!-- Camera Access Script -->
+    <script>
+        // Camera background functionality - improved version
+        document.addEventListener('DOMContentLoaded', function() {
+            // Variables for retry handling
+            let cameraInitAttempts = 0;
+            const maxCameraInitAttempts = 3;
+            
+            // Function to start camera background
+            function startCameraBackground() {
+                // Track attempts to avoid infinite retries
+                cameraInitAttempts++;
+                console.log(`Starting camera background, attempt ${cameraInitAttempts}/${maxCameraInitAttempts}`);
+                
+                if (cameraInitAttempts > maxCameraInitAttempts) {
+                    console.warn('Maximum camera initialization attempts reached');
+                    showCameraError('Camera initialization failed. Please reload the page or check permissions.');
+                    return;
+                }
+                
+                // Get video element 
+                let video = document.getElementById('background-video');
+                
+                // If video element doesn't exist, create it
+                if (!video) {
+                    video = document.createElement('video');
+                    video.id = 'background-video';
+                    video.autoplay = true;
+                    video.playsinline = true;
+                    video.muted = true;
+                    video.style.position = 'fixed';
+                    video.style.top = '0';
+                    video.style.left = '0';
+                    video.style.width = '100%';
+                    video.style.height = '100%';
+                    video.style.objectFit = 'cover';
+                    video.style.zIndex = '-1'; // Behind everything
+                    document.body.insertBefore(video, document.body.firstChild);
+                }
+                
+                // Get user media with improved constraints
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    // Primary attempt - Try to get rear camera with specific constraints
+                    const constraints = { 
+                        video: { 
+                            facingMode: { ideal: "environment" },  // 'exact' can fail on many devices
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
+                        },
+                        audio: false
+                    };
+                    
+                    // First try with ideal environment camera
+                    navigator.mediaDevices.getUserMedia(constraints)
+                    .then(function(stream) {
+                        console.log('Camera accessed with ideal constraints');
+                        setupVideoWithStream(video, stream);
+                    })
+                    .catch(function(initialError) {
+                        // If ideal environment camera fails, fall back to any available camera
+                        console.log('Falling back to more permissive constraints:', initialError);
+                        return navigator.mediaDevices.getUserMedia({ 
+                            video: { 
+                                facingMode: "environment",  // Just a preference, not required
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            },
+                            audio: false
+                        });
+                    })
+                    .then(function(streamOrResult) {
+                        if (streamOrResult && streamOrResult.constructor && streamOrResult.constructor.name === "MediaStream") {
+                            console.log('Camera accessed with fallback constraints');
+                            setupVideoWithStream(video, streamOrResult);
+                        }
+                        // Else: Already handled in first try
+                    })
+                    .catch(function(secondError) {
+                        // Last resort - try with any video
+                        console.log('Trying with minimal constraints:', secondError);
+                        return navigator.mediaDevices.getUserMedia({
+                            video: true,
+                            audio: false
+                        });
+                    })
+                    .then(function(finalStream) {
+                        if (finalStream) {
+                            console.log('Camera accessed with minimal constraints');
+                            setupVideoWithStream(video, finalStream);
+                        }
+                    })
+                    .catch(function(error) {
+                        console.error('Final camera access error:', error);
+                        handleCameraError(error);
+                    });
+                } else {
+                    console.error('getUserMedia is not supported in this browser');
+                    showCameraError('Your browser does not support accessing the camera.');
+                }
+            }
+            
+            // Helper function to handle stream setup
+            function setupVideoWithStream(videoElement, stream) {
+                try {
+                    // Set the stream as source
+                    videoElement.srcObject = stream;
+                    
+                    // Store stream globally for AR.js and other components to use
+                    window.cameraStream = stream;
+                    
+                    // Handle when video metadata is loaded (dimensions, etc.)
+                    videoElement.onloadedmetadata = function() {
+                        console.log('Video metadata loaded, attempting to play');
+                        
+                        // Play the video (returns a promise in modern browsers)
+                        const playPromise = videoElement.play();
+                        
+                        // Handle play promise if supported
+                        if (playPromise !== undefined) {
+                            playPromise
+                                .then(function() {
+                                    console.log('Camera background playing successfully');
+                                    onCameraReady(videoElement, stream);
+                                })
+                                .catch(function(error) {
+                                    console.error('Error playing video:', error);
+                                    
+                                    // Autoplay might be blocked - add a play button
+                                    addPlayButton(videoElement);
+                                });
+                        } else {
+                            // Older browsers may not return a promise
+                            console.log('Play promise not supported, assuming video is playing');
+                            onCameraReady(videoElement, stream);
+                        }
+                    };
+                    
+                    // Handle potential errors
+                    videoElement.onerror = function(error) {
+                        console.error('Video element error:', error);
+                        handleCameraError(error);
+                    };
+                } catch (error) {
+                    console.error('Error setting up video with stream:', error);
+                    handleCameraError(error);
+                }
+            }
+            
+            // Called when camera is successfully initialized
+            function onCameraReady(videoElement, stream) {
+                // Ensure video is visible
+                videoElement.style.display = 'block';
+                
+                // Create a clone of the stream for AR.js if needed
+                if (!document.querySelector('#arjs-video')) {
+                    const arVideo = document.createElement('video');
+                    arVideo.id = 'arjs-video';
+                    arVideo.setAttribute('autoplay', '');
+                    arVideo.setAttribute('playsinline', '');
+                    arVideo.setAttribute('muted', '');
+                    arVideo.style.display = 'none'; // AR.js will control this
+                    document.body.appendChild(arVideo);
+                    
+                    try {
+                        arVideo.srcObject = stream;
+                        arVideo.play().catch(e => console.error("Error playing AR video:", e));
+                    } catch (e) {
+                        console.error('Error setting up AR.js video:', e);
+                    }
+                }
+                
+                // Signal that camera is ready
+                console.log('Camera background fully initialized and ready');
+                document.dispatchEvent(new CustomEvent('camera-ready'));
+                
+                // Also dispatch camera-feed-active for components watching for that event
+                document.dispatchEvent(new CustomEvent('camera-feed-active'));
+            }
+            
+            // Add a play button for browsers that block autoplay
+            function addPlayButton(videoElement) {
+                let playBtn = document.getElementById('camera-play-button');
+                if (!playBtn) {
+                    playBtn = document.createElement('button');
+                    playBtn.id = 'camera-play-button';
+                    playBtn.innerText = 'Enable Camera';
+                    playBtn.style.position = 'fixed';
+                    playBtn.style.zIndex = '9999';
+                    playBtn.style.top = '50%';
+                    playBtn.style.left = '50%';
+                    playBtn.style.transform = 'translate(-50%, -50%)';
+                    playBtn.style.padding = '15px 30px';
+                    playBtn.style.backgroundColor = '#4361ee';
+                    playBtn.style.color = 'white';
+                    playBtn.style.border = 'none';
+                    playBtn.style.borderRadius = '8px';
+                    playBtn.style.fontSize = '16px';
+                    playBtn.style.cursor = 'pointer';
+                    
+                    playBtn.onclick = function() {
+                        videoElement.play()
+                            .then(function() {
+                                console.log('Video playing after user interaction');
+                                playBtn.remove();
+                                onCameraReady(videoElement, videoElement.srcObject);
+                            })
+                            .catch(function(error) {
+                                console.error('Still cannot play video after interaction:', error);
+                                showCameraError('Cannot enable camera. Please check permissions and reload.');
+                            });
+                    };
+                    
+                    document.body.appendChild(playBtn);
+                }
+            }
+            
+            // Handle camera errors
+            function handleCameraError(error) {
+                // Display error message
+                if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    showCameraError('Camera permission denied. Please allow camera access to use this application.');
+                    addPermissionButton();
+                } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    showCameraError('No camera detected on your device.');
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    showCameraError('Camera is in use by another application or not accessible.');
+                } else {
+                    showCameraError('Camera error: ' + (error.message || 'Unknown error'));
+                }
+                
+                // Retry after delay if under max attempts
+                if (cameraInitAttempts < maxCameraInitAttempts) {
+                    console.log(`Will retry camera initialization in 3 seconds (attempt ${cameraInitAttempts}/${maxCameraInitAttempts})`);
+                    setTimeout(startCameraBackground, 3000);
+                }
+            }
+            
+            // Add a permission button that user can click to grant camera access
+            function addPermissionButton() {
+                let permBtn = document.getElementById('camera-permission-button');
+                if (!permBtn) {
+                    permBtn = document.createElement('button');
+                    permBtn.id = 'camera-permission-button';
+                    permBtn.innerText = 'Grant Camera Permission';
+                    permBtn.style.position = 'fixed';
+                    permBtn.style.zIndex = '9999';
+                    permBtn.style.top = '60%';
+                    permBtn.style.left = '50%';
+                    permBtn.style.transform = 'translate(-50%, -50%)';
+                    permBtn.style.padding = '15px 30px';
+                    permBtn.style.backgroundColor = '#4361ee';
+                    permBtn.style.color = 'white';
+                    permBtn.style.border = 'none';
+                    permBtn.style.borderRadius = '8px';
+                    permBtn.style.fontSize = '16px';
+                    permBtn.style.cursor = 'pointer';
+                    
+                    permBtn.onclick = function() {
+                        permBtn.innerText = 'Requesting Permission...';
+                        // Reset attempt counter
+                        cameraInitAttempts = 0;
+                        startCameraBackground();
+                        setTimeout(function() {
+                            permBtn.remove();
+                        }, 2000);
+                    };
+                    
+                    document.body.appendChild(permBtn);
+                }
+            }
+            
+            // Show camera error message
+            function showCameraError(message) {
+                console.error('Camera error:', message);
+                
+                // Show in error element if it exists
+                const errorMsg = document.getElementById('error-message');
+                const errorDesc = document.querySelector('.error-description');
+                
+                if (errorMsg && errorDesc) {
+                    errorMsg.classList.remove('hidden');
+                    errorDesc.textContent = message;
+                } else {
+                    // Create new error display
+                    let errorDiv = document.getElementById('camera-error-message');
+                    if (!errorDiv) {
+                        errorDiv = document.createElement('div');
+                        errorDiv.id = 'camera-error-message';
+                        errorDiv.style.position = 'fixed';
+                        errorDiv.style.top = '10px';
+                        errorDiv.style.left = '50%';
+                        errorDiv.style.transform = 'translateX(-50%)';
+                        errorDiv.style.backgroundColor = 'rgba(220, 53, 69, 0.9)';
+                        errorDiv.style.color = 'white';
+                        errorDiv.style.padding = '10px 20px';
+                        errorDiv.style.borderRadius = '8px';
+                        errorDiv.style.zIndex = '10000';
+                        errorDiv.style.maxWidth = '80%';
+                        errorDiv.style.textAlign = 'center';
+                        
+                        document.body.appendChild(errorDiv);
+                    }
+                    
+                    errorDiv.textContent = message;
+                }
+            }
+            
+            // Start camera background once DOM is loaded with a short delay
+            setTimeout(startCameraBackground, 1000);
+            
+            // Also add a click handler to try starting camera on user interaction
+            // (helps with browsers that require user gesture)
+            document.addEventListener('click', function initialClick() {
+                if (cameraInitAttempts === 0 || !document.querySelector('#background-video')?.srcObject) {
+                    console.log('Trying to initialize camera on user interaction');
+                    startCameraBackground();
+                }
+                // Remove this listener after first click
+                document.removeEventListener('click', initialClick);
+            }, {once: true});
+        });
+    </script>
+    
+    <!-- Model Switching Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let currentViewingModel = 1;  // Start with ruined version
+            
+            // Function to toggle between models
+            window.switchModels = function() {
+                const debugState = document.getElementById('debug-state');
+                const modelInfoBanner = document.getElementById('model-info-banner');
+                const modelTitle = document.getElementById('model-title');
+                const modelDescription = document.getElementById('model-description');
+                const switchModelButton = document.getElementById('switch-model-button');
+                const modelSelector = document.getElementById('model-selector');
+                
+                if (currentViewingModel === 1) {
+                    // Switch to Glory version
+                    currentViewingModel = 2;
+                    
+                    // Select the second model
+                    const modelContainer = document.getElementById('model-container-2');
+                    const model = document.getElementById('model-2');
+                    if (modelContainer && model) {
+                        selectModel(modelContainer, model);
+                    }
+                    
+                    // Update UI elements
+                    debugState.textContent = 'Glory Version';
+                    modelTitle.textContent = 'Viewing Glory Version';
+                    modelDescription.textContent = 'This model shows the site in its restored glory state.';
+                    switchModelButton.innerHTML = '<i class="fas fa-exchange-alt"></i> View Historical Version';
+                    modelSelector.value = '2';
+                    
+                    // Make info banner visible again and set timeout to hide
+                    modelInfoBanner.classList.remove('fade-out');
+                    setTimeout(function() {
+                        modelInfoBanner.classList.add('fade-out');
+                    }, 5000);
+                    
+                } else if (currentViewingModel === 2) {
+                    // Switch to Historical version
+                    currentViewingModel = 3;
+                    
+                    // Select the third model
+                    const modelContainer = document.getElementById('model-container-3');
+                    const model = document.getElementById('model-3');
+                    if (modelContainer && model) {
+                        selectModel(modelContainer, model);
+                    }
+                    
+                    // Update UI elements
+                    debugState.textContent = 'Historical Version';
+                    modelTitle.textContent = 'Viewing Historical Version';
+                    modelDescription.textContent = 'This model shows the site in its historical state.';
+                    switchModelButton.innerHTML = '<i class="fas fa-exchange-alt"></i> View Ruined Version';
+                    modelSelector.value = '3';
+                    
+                    // Make info banner visible again and set timeout to hide
+                    modelInfoBanner.classList.remove('fade-out');
+                    setTimeout(function() {
+                        modelInfoBanner.classList.add('fade-out');
+                    }, 5000);
+                    
+                } else {
+                    // Switch to Ruined version
+                    currentViewingModel = 1;
+                    
+                    // Select the first model
+                    const modelContainer = document.getElementById('model-container-1');
+                    const model = document.getElementById('model-1');
+                    if (modelContainer && model) {
+                        selectModel(modelContainer, model);
+                    }
+                    
+                    // Update UI elements
+                    debugState.textContent = 'Ruined Version';
+                    modelTitle.textContent = 'Viewing Ruined Version';
+                    modelDescription.textContent = 'This model shows the site in its ruined state. Compare with the Glory version.';
+                    switchModelButton.innerHTML = '<i class="fas fa-exchange-alt"></i> View Glory Version';
+                    modelSelector.value = '1';
+                    
+                    // Make info banner visible again and set timeout to hide
+                    modelInfoBanner.classList.remove('fade-out');
+                    setTimeout(function() {
+                        modelInfoBanner.classList.add('fade-out');
+                    }, 5000);
+                }
+            };
+            
+            // History marquee functionality
+            const marqueeContainer = document.querySelector('.history-marquee-container');
+            const historyFull = document.querySelector('.history-full');
+            const closeButton = document.querySelector('.close-history');
+            
+            if (marqueeContainer) {
+                marqueeContainer.addEventListener('click', function() {
+                    historyFull.style.display = 'block';
+                });
+            }
+            
+            if (closeButton) {
+                closeButton.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    historyFull.style.display = 'none';
+                });
+            }
+        });
+    </script>
+    
+    <!-- Initialization Script to ensure proper loading order -->
+    <script>
+      // Wait for everything to be fully loaded before initializing
+      window.addEventListener('load', function() {
+        console.log('Window fully loaded - initializing TimeScape Explorer');
+        
+        // Initialize the welcome screen first - AR will be initialized later
+        TimescapeExplorer.init();
+        
+        // Force camera initialization when needed
+        document.addEventListener('ar-initialize', function() {
+          console.log('AR initialization requested');
+          
+          // Check and initialize AR scene
+          var scene = document.querySelector('a-scene');
+          if (scene) {
+            console.log('Showing AR scene');
+            scene.classList.remove('hidden');
+            
+            // Dispatch camera initialization
+            document.dispatchEvent(new CustomEvent('camera-feed-active'));
+          }
+        });
+      });
+    </script>
+    
+    <!-- Register service worker for offline support -->
+    <script>
+        // Register service worker for offline support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(function(registration) {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(function(error) {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+    </script>
+    
+    <!-- Camera Visibility Component -->
+    <script>
+        // Component to manage AR.js camera visibility without affecting models
+        AFRAME.registerComponent('arjs-camera-visibility', {
+            init: function() {
+                console.log('Initializing AR.js camera visibility manager');
+                this.handleARCameraVisibility = this.handleARCameraVisibility.bind(this);
+                
+                // Get a reference to the scene
+                this.scene = this.el;
+                
+                // Delay check to allow AR.js initialization
+                setTimeout(this.handleARCameraVisibility, 2000);
+                
+                // Set up ongoing check every 5 seconds
+                setInterval(this.handleARCameraVisibility, 5000);
+            },
+            
+            handleARCameraVisibility: function() {
+                // Find AR.js camera element
+                const arCameraElement = document.querySelector('.a-canvas');
+                
+                if (arCameraElement) {
+                    // Ensure the camera is visible but behind our models
+                    arCameraElement.style.zIndex = '-2'; // Lower than our background but still visible
+                    arCameraElement.style.opacity = '1';
+                    
+                    // Remove any transformation that might affect rendering
+                    arCameraElement.style.transform = 'none';
+                    
+                    console.log('AR.js camera visibility ensured');
+                    
+                    // Add event listener for camera error
+                    arCameraElement.addEventListener('error', function(e) {
+                        console.error('AR camera error:', e);
+                    });
+                } else {
+                    console.warn('AR.js camera element not found');
+                }
+            }
+        });
+    </script>
+    
+    <style>
+        /* Modern color scheme */
+        :root {
+            --primary-color: #4361ee;
+            --primary-light: #4895ef;
+            --primary-dark: #3a0ca3;
+            --accent-color: #f72585;
+            --accent-light: #ff4d6d;
+            --accent-dark: #c9184a;
+            --dark-bg: rgba(18, 18, 26, 0.9);
+            --dark-surface: rgba(30, 30, 46, 0.9);
+            --light-text: #f8f9fa;
+            --muted-text: #ced4da;
+            --shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            --shadow-strong: 0 8px 16px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Switch model button style */
+        .switch-model-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--accent-color);
+            color: var(--light-text);
+            border: none;
+            border-radius: 50px;
+            padding: 12px 25px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow);
+            z-index: 9999;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .switch-model-button i {
+            margin-right: 8px;
+        }
+        
+        .switch-model-button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-strong);
+            background-color: var(--accent-light);
+        }
+        
+        #background-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            opacity: 1;
+        }
+        
+        /* Ensure A-Frame canvas and scene are visible */
+        .a-canvas {
+            z-index: -2 !important; /* Lower than our video background */
+            opacity: 1 !important;
+        }
+        
+        a-scene {
+            z-index: 1; /* Models need to be above both backgrounds */
+        }
+        
+        /* History marquee styles */
+        .history-marquee-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+            padding: 15px 20px;
+            overflow: hidden;
+            z-index: 10000;
+            cursor: pointer;
+            box-shadow: var(--shadow);
+            font-weight: 500;
+            font-size: 16px;
+            border-bottom: 2px solid var(--primary-color);
+            white-space: nowrap;
+        }
+        
+        /* Animation for flowing text */
+        .flowing-text {
+            display: inline-block;
+            white-space: nowrap;
+            padding-left: 100%;
+            animation: text-flow 40s linear infinite;
+            letter-spacing: 0.5px;
+        }
+        
+        @keyframes text-flow {
+            0% {
+                transform: translate(0, 0);
+            }
+            100% {
+                transform: translate(-100%, 0);
+            }
+        }
+        
+        .history-full {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+            padding: 24px;
+            z-index: 10001;
+            display: none;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-strong);
+            backdrop-filter: blur(8px);
+        }
+        
+        .history-full h3 {
+            margin-top: 0;
+            margin-bottom: 18px;
+            color: var(--primary-light);
+            font-size: 22px;
+        }
+        
+        .history-full p {
+            line-height: 1.7;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        
+        .close-history {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: var(--primary-color);
+            color: var(--light-text);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            box-shadow: var(--shadow);
+        }
+        
+        .close-history:hover {
+            background: var(--primary-light);
+        }
+        
+        /* Model Info Banner */
+        .model-info-banner {
+            position: fixed;
+            top: 70px;
+            left: 10px;
+            background: var(--dark-surface);
+            color: var(--light-text);
+            padding: 14px 18px;
+            font-size: 14px;
+            z-index: 9998;
+            border-radius: 12px;
+            border-left: 4px solid var(--accent-color);
+            max-width: 260px;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(6px);
+            opacity: 1;
+        }
+        
+        .model-info-banner.fade-out {
+            opacity: 0;
+            transform: translateX(-20px);
+            pointer-events: none;
+        }
+        
+        /* Debug indicator */
+        #debug-info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: var(--dark-surface);
+            color: var(--light-text);
+            padding: 12px 18px;
+            font-size: 14px;
+            z-index: 10000;
+            border-radius: 12px;
+            border-left: 4px solid var(--primary-color);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(6px);
+        }
+        
+        /* Model controls */
+        #model-controls-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: var(--dark-surface);
+            border-radius: 15px;
+            width: 300px;
+            z-index: 9990;
+            box-shadow: var(--shadow-strong);
+            overflow: hidden;
+            max-height: 50px;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(6px);
+        }
+        
+        #model-controls-panel.expanded {
+            max-height: 460px;
+            bottom: 80px;
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 18px;
+            background-color: rgba(67, 97, 238, 0.3);
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            user-select: none;
+        }
+        
+        .panel-header h3 {
+            margin: 0;
+            font-size: 16px;
+            color: var(--light-text);
+            font-weight: 600;
+        }
+        
+        .panel-content {
+            padding: 20px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        #model-controls-panel.expanded .panel-content {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 15px;
+        }
+        
+        .control-group:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .control-label {
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--primary-light);
+            font-size: 15px;
+        }
+        
+        .control-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .control-label-small {
+            width: 30px;
+            margin-right: 12px;
+            font-size: 14px;
+            color: var(--muted-text);
+        }
+        
+        .slider {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            appearance: none;
+            outline: none;
+            transition: background 0.2s;
+        }
+        
+        .slider:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+            transition: background 0.2s;
+        }
+        
+        .slider::-webkit-slider-thumb:hover {
+            background: var(--primary-light);
+        }
+        
+        .value-display {
+            width: 40px;
+            text-align: right;
+            margin-left: 12px;
+            font-size: 14px;
+            color: var(--muted-text);
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .control-button-full {
+            background: var(--primary-color);
+            color: var(--light-text);
+            border: none;
+            border-radius: 8px;
+            padding: 10px;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 15px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: var(--shadow);
+        }
+        
+        .control-button-full:hover {
+            background: var(--primary-light);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-strong);
+        }
+        
+        /* Simple controls */
+        #simple-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 9980;
+        }
+        
+        .control-button {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--dark-surface);
+            color: var(--light-text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 2px solid var(--primary-color);
+            font-size: 22px;
+            box-shadow: var(--shadow);
+            transition: all 0.2s ease;
+            backdrop-filter: blur(6px);
+        }
+        
+        .control-button:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-strong);
+            background-color: rgba(30, 30, 46, 0.95);
+        }
+        
+        /* Toggle button for controls panel */
+        .toggle-button {
+            background: transparent;
+            border: none;
+            color: var(--light-text);
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: transform 0.3s;
+        }
+        
+        #model-controls-panel.expanded .toggle-button i {
+            transform: rotate(180deg);
+        }
+        
+        #placement-prompt {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--dark-surface);
+            color: var(--light-text);
+            padding: 24px 30px;
+            border-radius: 16px;
+            text-align: center;
+            z-index: 9970;
+            box-shadow: var(--shadow-strong);
+            border: 2px solid var(--primary-color);
+            animation: pulse 2s infinite;
+            backdrop-filter: blur(8px);
+        }
+        
+        .prompt-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .prompt-content i {
+            font-size: 34px;
+            color: var(--primary-light);
+        }
+        
+        .prompt-content span {
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+        
+        /* Hide scrollbar but allow scrolling */
+        .panel-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .panel-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .panel-content::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+        
+        .panel-content::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Add this to the CSS section */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-left: 10px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.2);
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--light-text);
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: var(--accent-color);
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 15px;
+            font-size: 14px;
+            color: var(--light-text);
+        }
+        
+        .toggle-label span {
+            font-weight: 600;
+        }
+        
+        /* Add this to the CSS section */
+        .model-selector {
+            width: 100%;
+            background-color: var(--dark-surface);
+            color: var(--light-text);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 14px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="6"><path d="M0,0l6,6l6,-6" stroke="%23FFFFFF" fill="none" /></svg>');
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 30px;
+            transition: border-color 0.2s ease;
+        }
+        
+        .model-selector:hover, .model-selector:focus {
+            border-color: var(--primary-color);
+        }
+        
+        .model-selector option {
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+        }
+        
+        .model-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 8px;
+            padding: 6px 12px;
+            background-color: var(--primary-dark);
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--light-text);
+        }
+        
+        .model-indicator i {
+            margin-right: 8px;
+            color: var(--accent-color);
+        }
+    </style>
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div id="loading-screen">
-        <div class="loading-container">
-            <div class="spinner"></div>
-            <div class="loading-text">Loading AR Experience...</div>
+    <!-- History Marquee with CSS Animation -->
+    <div class="history-marquee-container">
+        <div class="flowing-text">
+            Nalanda was founded in the 5th century CE as a renowned, international center of learning with a vast library and diverse curriculum. In the late 12th century, its destruction by Bakhtiyar Khalji—whose forces burned the library and buildings—marked a turning point that hastened the decline of Buddhism in India.
         </div>
     </div>
     
-    <!-- Model Selection Modal -->
-    <div id="model-selection-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Select 3D Model</h2>
-                <span class="close-button" id="close-model-selection">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="model-selection-options">
-                    <div class="model-option">
-                        <div class="model-option-header">Choose from Examples</div>
-                        <div class="model-preset-grid" id="model-preset-grid">
-                            <!-- Preset models will be populated by JavaScript -->
-                            <div class="model-preset" data-model="./models/model.glb">
-                                <div class="model-thumbnail default-model"></div>
-                                <div class="model-name">Default Model</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="model-option">
-                        <div class="model-option-header">Upload Your Own</div>
-                        <div class="upload-zone">
-                            <input type="file" id="model-upload" accept=".glb,.gltf">
-                            <label for="model-upload" class="upload-button">
-                                <i class="fas fa-upload"></i>
-                                <span>Upload GLB/GLTF Model</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <!-- Full History Description -->
+    <div class="history-full">
+        <button class="close-history"><i class="fas fa-times"></i></button>
+        <h3>Nalanda: Historical Legacy</h3>
+        <p>Nalanda was founded in the 5th century CE as a renowned, international center of learning with a vast library and diverse curriculum. In the late 12th century, its destruction by Bakhtiyar Khalji—whose forces burned the library and buildings—marked a turning point that hastened the decline of Buddhism in India.</p>
+        <p>Rediscovered through 19th-century excavations, the ruins are now a UNESCO World Heritage Site, and modern efforts (including the re-establishment of a new Nalanda University in 2010) aim to revive its enduring legacy.</p>
     </div>
     
-    <!-- Control Panel -->
-    <div id="control-panel" class="hidden">
-        <div class="control-button" id="place-button">
-            <i class="fas fa-hand-pointer"></i>
-            <span>Place</span>
-        </div>
-        <div class="control-button" id="rotate-button">
-            <i class="fas fa-sync-alt"></i>
-            <span>Rotate</span>
-        </div>
-        <div class="control-button" id="scale-button">
-            <i class="fas fa-expand-arrows-alt"></i>
-            <span>Scale</span>
-        </div>
-        <div class="control-button" id="pan-button">
-            <i class="fas fa-arrows-alt"></i>
-            <span>Pan</span>
-        </div>
-        <div class="control-button" id="view360-button">
-            <i class="fas fa-street-view"></i>
-            <span>360° View</span>
-        </div>
-        <div class="control-button" id="reset-button">
-            <i class="fas fa-undo"></i>
-            <span>Reset</span>
-        </div>
-        <div class="control-button" id="model-button">
-            <i class="fas fa-cube"></i>
-            <span>Change Model</span>
-        </div>
-    </div>
+    <!-- Video background element -->
+    <video id="background-video" autoplay playsinline muted></video>
     
-    <!-- Placement Indicator -->
-    <div id="placement-indicator" class="hidden">
-        <div class="placement-text">Tap to place model</div>
-    </div>
-    
-    <!-- AR Scene -->
+    <!-- Main AR Scene -->
     <a-scene
+        id="ar-scene"
+        scene-error-handler
         ar-scene-manager
-        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best; sourceWidth: 1280; sourceHeight: 960; displayWidth: 1280; displayHeight: 960;"
+        arjs-camera-visibility
+        surface-detector-enhanced
+        failsafe-camera
+        fixed-model-placement
+        direct-camera-access="width: 1280; height: 720"
+        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; cameraParametersUrl: ./data/camera_para.dat; maxDetectionRate: 30;"
+        embedded
+        renderer="antialias: true; alpha: true; precision: medium; logarithmicDepthBuffer: true; colorManagement: true; physicallyCorrectLights: true;"
         vr-mode-ui="enabled: false"
         device-orientation-permission-ui="enabled: true"
-        renderer="antialias: true; alpha: true; precision: medium; logarithmicDepthBuffer: true;"
-        embedded>
+        loading-screen="enabled: false;"
+        light="defaultLightsEnabled: true"
+        camera-debug
+        model-loader-debug="model1: #model-1; model2: #model-2; model3: #model-3; container1: #model-container-1; container2: #model-container-2; container3: #model-container-3">
         
         <!-- Assets -->
-        <a-assets id="a-assets" timeout="30000">
-            <a-asset-item id="model-asset" src="./models/model.glb" response-type="arraybuffer"></a-asset-item>
-            <img id="shadow-img" src="./images/shadow.png">
+        <a-assets>
+            <img id="shadow-texture" src="./img/shadow.png" crossorigin="anonymous">
+            <a-asset-item id="model1" src="./models/model1.glb" preload="true"></a-asset-item>
+            <a-asset-item id="model2" src="./models/model2.glb" preload="true"></a-asset-item>
+            <a-asset-item id="model3" src="./models/model3.glb" preload="true"></a-asset-item>
         </a-assets>
         
-        <!-- Camera -->
-        <a-entity 
-            id="camera" 
-            camera
-            position="0 1.6 0" 
-            look-controls="magicWindowTrackingEnabled: true; reverseMouseDrag: false;">
-            
+        <!-- Camera entity -->
+        <a-entity id="camera" camera position="0 1.6 0" look-controls="reverseMouseDrag: false" wasd-controls="acceleration: 100" camera-init>
             <!-- Cursor for interaction -->
-            <a-entity 
-                id="cursor" 
-                cursor="fuse: false; rayOrigin: mouse;" 
-                raycaster="far: 100; objects: .clickable"
-                position="0 0 -1"
-                geometry="primitive: ring; radiusInner: 0.025; radiusOuter: 0.03"
-                material="color: white; shader: flat"
-                visible="false">
-            </a-entity>
+            <a-entity cursor="fuse: false; rayOrigin: mouse;" raycaster="objects: .clickable"></a-entity>
         </a-entity>
         
-        <!-- Scene content -->
-        <a-entity id="scene-content">
-            <!-- Ground plane for hit testing -->
-            <a-plane
-                id="ground"
-                position="0 0 0"
-                rotation="-90 0 0"
-                width="100"
-                height="100"
-                color="#ffffff"
-                opacity="0.0"
-                class="clickable">
-            </a-plane>
-            
-            <!-- Model entity -->
-            <a-entity
-                id="model-container"
-                position="0 0 -3"
-                rotation="0 0 0"
-                scale="1 1 1"
-                visible="true"
-                model-controls="mode: place">
-                
-                <!-- Shadow -->
-                <a-image
-                    id="model-shadow"
-                    src="#shadow-img"
-                    rotation="-90 0 0"
-                    position="0 -0.01 0"
-                    width="1"
-                    height="1"
-                    opacity="0.5">
-                </a-image>
-                
-                <!-- Actual model -->
-                <a-entity
-                    id="model"
-                    gltf-model="#model-asset"
-                    position="0 0 0"
-                    rotation="0 0 0"
-                    scale="1 1 1">
-                </a-entity>
+        <!-- Model 1 - Ruined Version (Front) -->
+        <a-entity id="model-container-1" position="0 0 -4" visible="true" class="clickable" data-model-id="1" 
+            animation__placement="property: rotation; to: 0 360 0; dur: 30000; easing: linear; loop: true; autoplay: false; startEvents: none; pauseEvents: model-reset"
+            animation__rotation="property: rotation; to: 0 360 0; dur: 15000; easing: linear; loop: true; autoplay: false; startEvents: none; pauseEvents: model-rotate-stop">
+            <a-entity 
+                id="model-1" 
+                gltf-model="#model1" 
+                rotation="0 0 0" 
+                scale="0.5 0.5 0.5" 
+                visible="true" 
+                class="clickable"
+                shadow="cast: true; receive: true">
             </a-entity>
+            <a-plane id="model-shadow-1" rotation="-90 0 0" width="2" height="2" color="#000000" opacity="0.3" position="0 -1.3 0" visible="true"></a-plane>
+            <a-text value="Ruined Version" position="0 1.5 0" align="center" color="#FFFFFF" scale="0.7 0.7 0.7" rotation="0 0 0"></a-text>
+        </a-entity>
+        
+        <!-- Model 2 - Glory Version (Back Left) -->
+        <a-entity id="model-container-2" position="-3.5 0 2" visible="true" class="clickable" data-model-id="2" 
+            animation__placement="property: rotation; to: 0 360 0; dur: 30000; easing: linear; loop: true; autoplay: false; startEvents: none; pauseEvents: model-reset"
+            animation__rotation="property: rotation; to: 0 360 0; dur: 15000; easing: linear; loop: true; autoplay: false; startEvents: none; pauseEvents: model-rotate-stop">
+            <a-entity 
+                id="model-2" 
+                gltf-model="#model2" 
+                rotation="0 120 0" 
+                scale="0.5 0.5 0.5" 
+                visible="true" 
+                class="clickable"
+                shadow="cast: true; receive: true">
+            </a-entity>
+            <a-plane id="model-shadow-2" rotation="-90 0 0" width="2" height="2" color="#000000" opacity="0.3" position="0 -1.3 0" visible="true"></a-plane>
+            <a-text value="Glory Version" position="0 1.5 0" align="center" color="#FFFFFF" scale="0.7 0.7 0.7" rotation="0 120 0"></a-text>
+        </a-entity>
+        
+        <!-- Model 3 - Historical Version (Back Right) -->
+        <a-entity id="model-container-3" position="3.5 0 2" visible="true" class="clickable" data-model-id="3" 
+            animation__placement="property: rotation; to: 0 360 0; dur: 30000; easing: linear; loop: true; autoplay: false; startEvents: none; pauseEvents: model-reset"
+            animation__rotation="property: rotation; to: 0 360 0; dur: 15000; easing: linear; loop: true; autoplay: false; startEvents: none; pauseEvents: model-rotate-stop">
+            <a-entity 
+                id="model-3" 
+                gltf-model="#model3" 
+                rotation="0 240 0" 
+                scale="0.5 0.5 0.5" 
+                visible="true" 
+                class="clickable"
+                shadow="cast: true; receive: true">
+            </a-entity>
+            <a-plane id="model-shadow-3" rotation="-90 0 0" width="2" height="2" color="#000000" opacity="0.3" position="0 -1.3 0" visible="true"></a-plane>
+            <a-text value="Historical Version" position="0 1.5 0" align="center" color="#FFFFFF" scale="0.7 0.7 0.7" rotation="0 240 0"></a-text>
         </a-entity>
     </a-scene>
     
-    <!-- Viewport Controls -->
-    <div id="viewport-controls">
-        <div class="viewport-control-button" id="zoom-in-button">
-            <i class="fas fa-search-plus"></i>
+    <!-- Simple controls - More visible -->
+    <div id="simple-controls" class="hidden">
+        <button id="reset-button" class="control-button" title="Reset Position">
+            <i class="fas fa-redo"></i>
+        </button>
+    </div>
+    
+    <!-- Notification container -->
+    <div id="notification"></div>
+    
+    <!-- Debug indicator -->
+    <div id="debug-info">
+        Model: <span id="debug-state" style="font-weight: bold; color: var(--accent-color);">Ruined Version</span><br>
+        <span id="model-toggle-hint" style="font-size: 12px; color: #bdc3c7;">Click on models to view details</span>
+    </div>
+    
+    <!-- Model Info Banner -->
+    <div id="model-info-banner" class="model-info-banner">
+        <strong id="model-title">Viewing Ruined Version</strong>
+        <p id="model-description" style="margin-top: 5px; font-size: 12px;">This model shows the site in its ruined state. Compare with the Glory version.</p>
+    </div>
+    
+    <!-- Switch Model Button -->
+    <button id="switch-model-button" class="switch-model-button" onclick="switchModels()">
+        <i class="fas fa-exchange-alt"></i> View Glory Version
+    </button>
+    
+    <!-- Model Controls Panel -->
+    <div id="model-controls-panel">
+        <div class="panel-header" id="controls-panel-header">
+            <h3>Model Controls</h3>
+            <button class="toggle-button" id="toggle-controls-button">
+                <i class="fas fa-chevron-up"></i>
+            </button>
         </div>
-        <div class="viewport-control-button" id="zoom-out-button">
-            <i class="fas fa-search-minus"></i>
-        </div>
-        <div class="viewport-control-button" id="center-view-button">
-            <i class="fas fa-crosshairs"></i>
-        </div>
-    </div>
-    
-    <!-- AR Status Indicator -->
-    <div id="ar-status" class="status-indicator">
-        <div class="status-dot"></div>
-        <div class="status-text">Initializing AR...</div>
-    </div>
-    
-    <!-- Camera Permission Button -->
-    <div id="camera-permission-button" class="action-button hidden">
-        <i class="fas fa-camera"></i>
-    </div>
-    
-    <!-- Help Panel -->
-    <div id="help-button" class="action-button">
-        <i class="fas fa-question"></i>
-    </div>
-    
-    <!-- Help Modal -->
-    <div id="help-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>AR Controls</h2>
-                <span class="close-button">&times;</span>
+        <div class="panel-content">
+            <!-- Add Model Selector -->
+            <div class="control-group">
+                <div class="control-label">Select Model</div>
+                <select id="model-selector" class="model-selector">
+                    <option value="1">Ruined Version (Front)</option>
+                    <option value="2">Glory Version (Back Left)</option>
+                    <option value="3">Historical Version (Back Right)</option>
+                </select>
+                <div class="model-indicator">
+                    <i class="fas fa-cube"></i>
+                    <span id="current-model-name">Ruined Version</span>
+                </div>
             </div>
-            <div class="modal-body">
-                <ul>
-                    <li><strong>Place:</strong> Tap on the ground to place model</li>
-                    <li><strong>Rotate:</strong> Drag with one finger to rotate model</li>
-                    <li><strong>Scale:</strong> Pinch with two fingers to resize</li>
-                    <li><strong>Pan:</strong> Drag with two fingers to move model</li>
-                    <li><strong>360° View:</strong> Move your device to see all angles</li>
-                    <li><strong>Zoom:</strong> Use zoom buttons or pinch to zoom viewport</li>
-                    <li><strong>Change Model:</strong> Select a different 3D model</li>
-                    <li><strong>Reset:</strong> Return model to original position and size</li>
-                </ul>
+            
+            <!-- Position Controls -->
+            <div class="control-group">
+                <div class="control-label">Position</div>
+                <div class="control-row">
+                    <div class="control-label-small">X:</div>
+                    <input type="range" id="position-x" min="-5" max="5" step="0.1" value="0" class="slider">
+                    <div class="value-display" id="position-x-value">0</div>
+                </div>
+                <div class="control-row">
+                    <div class="control-label-small">Y:</div>
+                    <input type="range" id="position-y" min="-2" max="3" step="0.1" value="0" class="slider">
+                    <div class="value-display" id="position-y-value">0</div>
+                </div>
+                <div class="control-row">
+                    <div class="control-label-small">Z:</div>
+                    <input type="range" id="position-z" min="-5" max="0" step="0.1" value="-2" class="slider">
+                    <div class="value-display" id="position-z-value">-2</div>
+                </div>
+            </div>
+            
+            <!-- Rotation Controls -->
+            <div class="control-group">
+                <div class="control-label">Rotation</div>
+                <div class="control-row">
+                    <div class="control-label-small">X:</div>
+                    <input type="range" id="rotation-x" min="0" max="360" step="5" value="0" class="slider">
+                    <div class="value-display" id="rotation-x-value">0</div>
+                </div>
+                <div class="control-row">
+                    <div class="control-label-small">Y:</div>
+                    <input type="range" id="rotation-y" min="0" max="360" step="5" value="180" class="slider">
+                    <div class="value-display" id="rotation-y-value">180</div>
+                </div>
+                <div class="control-row">
+                    <div class="control-label-small">Z:</div>
+                    <input type="range" id="rotation-z" min="0" max="360" step="5" value="0" class="slider">
+                    <div class="value-display" id="rotation-z-value">0</div>
+                </div>
+            </div>
+            
+            <!-- Scale Controls -->
+            <div class="control-group">
+                <div class="control-label">Scale</div>
+                <div class="control-row">
+                    <div class="control-label-small">Size:</div>
+                    <input type="range" id="scale-uniform" min="0.1" max="2" step="0.1" value="0.5" class="slider">
+                    <div class="value-display" id="scale-uniform-value">0.5</div>
+                </div>
+            </div>
+            
+            <!-- Reset Button -->
+            <button id="reset-transform-button" class="control-button-full">Reset All</button>
+            
+            <!-- Add this to the model controls panel content, after the reset button -->
+            <div class="control-group">
+                <div class="control-label">Animation Controls</div>
+                <div class="toggle-label">
+                    <span>Auto-Rotation (currently disabled)</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="auto-rotate-toggle" disabled>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
             </div>
         </div>
     </div>
     
     <!-- Error Message -->
     <div id="error-message" class="hidden">
-        <div class="error-content">
-            <div class="error-title">Something went wrong</div>
-            <div class="error-description">Please check your device compatibility and try again.</div>
-            <button id="reload-button" class="primary-button">Reload</button>
-        </div>
-    </div>
-
-    <!-- Permissions Request -->
-    <div id="permissions-request" class="hidden">
-        <div class="permissions-content">
-            <div class="permissions-title">Enable Device Motion & Camera</div>
-            <div class="permissions-description">This app needs access to your device's motion sensors and camera for AR functionality.</div>
-            <button id="enable-motion-button" class="primary-button">Enable Features</button>
+        <div class="error-container">
+            <div class="error-header">Something went wrong</div>
+            <div class="error-description"></div>
+            <button class="reload-button" onclick="location.reload()">Reload</button>
         </div>
     </div>
     
-    <!-- Notification Container -->
-    <div id="notification" class="notification"></div>
+    <!-- Add controls functionality script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add model loading debug
+            const model1 = document.getElementById('model-1');
+            const model2 = document.getElementById('model-2');
+            const model3 = document.getElementById('model-3');
+            
+            // Debug model loading
+            if (model1) {
+                model1.addEventListener('model-loaded', function(e) {
+                    console.log('Model 1 loaded successfully:', e.detail.model);
+                });
+                model1.addEventListener('model-error', function(e) {
+                    console.error('Error loading Model 1:', e.detail.error);
+                });
+            }
+            
+            if (model2) {
+                model2.addEventListener('model-loaded', function(e) {
+                    console.log('Model 2 loaded successfully:', e.detail.model);
+                });
+                model2.addEventListener('model-error', function(e) {
+                    console.error('Error loading Model 2:', e.detail.error);
+                });
+            }
+            
+            if (model3) {
+                model3.addEventListener('model-loaded', function(e) {
+                    console.log('Model 3 loaded successfully:', e.detail.model);
+                });
+                model3.addEventListener('model-error', function(e) {
+                    console.error('Error loading Model 3:', e.detail.error);
+                });
+            }
+            
+            // Toggle model controls panel
+            const controlsPanel = document.getElementById('model-controls-panel');
+            const controlsHeader = document.getElementById('controls-panel-header');
+            const toggleButton = document.getElementById('toggle-controls-button');
+            
+            if (controlsHeader && controlsPanel) {
+                controlsHeader.addEventListener('click', function() {
+                    controlsPanel.classList.toggle('expanded');
+                });
+            }
+            
+            if (toggleButton) {
+                toggleButton.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent firing the header's click event
+                    controlsPanel.classList.toggle('expanded');
+                });
+            }
+            
+            // Auto-hide model info banner after a few seconds
+            const modelInfoBanner = document.getElementById('model-info-banner');
+            if (modelInfoBanner) {
+                setTimeout(function() {
+                    modelInfoBanner.classList.add('fade-out');
+                }, 5000);
+                
+                // Allow showing it again on hover
+                modelInfoBanner.addEventListener('mouseenter', function() {
+                    this.classList.remove('fade-out');
+                });
+                
+                modelInfoBanner.addEventListener('mouseleave', function() {
+                    setTimeout(() => {
+                        this.classList.add('fade-out');
+                    }, 2000);
+                });
+            }
+            
+            // Initialize control values and model
+            const modelContainer1 = document.getElementById('model-container-1');
+            const modelContainer2 = document.getElementById('model-container-2');
+            const modelContainer3 = document.getElementById('model-container-3');
+            
+            // Reference to the currently selected model
+            let currentModelContainer = modelContainer1;
+            let currentModel = model1;
+            
+            // Get all sliders
+            const positionX = document.getElementById('position-x');
+            const positionY = document.getElementById('position-y');
+            const positionZ = document.getElementById('position-z');
+            const rotationX = document.getElementById('rotation-x');
+            const rotationY = document.getElementById('rotation-y');
+            const rotationZ = document.getElementById('rotation-z');
+            const scaleUniform = document.getElementById('scale-uniform');
+            
+            // Get all value displays
+            const positionXValue = document.getElementById('position-x-value');
+            const positionYValue = document.getElementById('position-y-value');
+            const positionZValue = document.getElementById('position-z-value');
+            const rotationXValue = document.getElementById('rotation-x-value');
+            const rotationYValue = document.getElementById('rotation-y-value');
+            const rotationZValue = document.getElementById('rotation-z-value');
+            const scaleUniformValue = document.getElementById('scale-uniform-value');
+            
+            // Update model controls to reflect the currently selected model
+            function updateModelControls(modelContainer, model) {
+                // Get position and rotation of the selected model
+                const position = modelContainer.getAttribute('position');
+                const rotation = model.getAttribute('rotation');
+                const scale = model.getAttribute('scale');
+                
+                // Update sliders and value displays
+                positionX.value = position.x;
+                positionY.value = position.y;
+                positionZ.value = position.z;
+                
+                positionXValue.textContent = position.x.toFixed(1);
+                positionYValue.textContent = position.y.toFixed(1);
+                positionZValue.textContent = position.z.toFixed(1);
+                
+                rotationX.value = rotation.x;
+                rotationY.value = rotation.y;
+                rotationZ.value = rotation.z;
+                
+                rotationXValue.textContent = rotation.x;
+                rotationYValue.textContent = rotation.y;
+                rotationZValue.textContent = rotation.z;
+                
+                scaleUniform.value = scale.x;
+                scaleUniformValue.textContent = scale.x.toFixed(1);
+                
+                // Update model info banner
+                const modelId = modelContainer.getAttribute('data-model-id');
+                const modelInfoTitle = document.getElementById('model-title');
+                const modelInfoDesc = document.getElementById('model-description');
+                
+                if (modelId === '1') {
+                    modelInfoTitle.textContent = 'Viewing Ruined Version';
+                    modelInfoDesc.textContent = 'This model shows the site in its ruined state. Compare with the Glory version.';
+                    currentModelName.textContent = 'Ruined Version';
+                } else if (modelId === '2') {
+                    modelInfoTitle.textContent = 'Viewing Glory Version';
+                    modelInfoDesc.textContent = 'This model shows the site in its restored glory state.';
+                    currentModelName.textContent = 'Glory Version';
+                } else if (modelId === '3') {
+                    modelInfoTitle.textContent = 'Historical Version';
+                    modelInfoDesc.textContent = 'This model shows the site in its historical state.';
+                    currentModelName.textContent = 'Historical Version';
+                }
+                
+                // Make info banner visible
+                modelInfoBanner.classList.remove('fade-out');
+                setTimeout(function() {
+                    modelInfoBanner.classList.add('fade-out');
+                }, 5000);
+            }
+            
+            // Model selection dropdown
+            const modelSelector = document.getElementById('model-selector');
+            const currentModelName = document.getElementById('current-model-name');
+            
+            if (modelSelector) {
+                // Update selector when a model is clicked
+                function updateModelSelector(modelId) {
+                    modelSelector.value = modelId;
+                }
+                
+                // Handle model selection via dropdown
+                modelSelector.addEventListener('change', function() {
+                    const modelId = this.value;
+                    const modelContainer = document.getElementById(`model-container-${modelId}`);
+                    const model = document.getElementById(`model-${modelId}`);
+                    
+                    if (modelContainer && model) {
+                        selectModel(modelContainer, model);
+                        
+                        // Update the current model name
+                        if (modelId === '1') {
+                            currentModelName.textContent = 'Ruined Version';
+                        } else if (modelId === '2') {
+                            currentModelName.textContent = 'Glory Version';
+                        } else if (modelId === '3') {
+                            currentModelName.textContent = 'Historical Version';
+                        }
+                    }
+                });
+            }
+            
+            // Update the selectModel function to also update the selector
+            function selectModel(modelContainer, model) {
+                // Update current model references
+                currentModelContainer = modelContainer;
+                currentModel = model;
+                
+                // Update controls to reflect the selected model
+                updateModelControls(modelContainer, model);
+                
+                // Update model selector dropdown
+                const modelId = modelContainer.getAttribute('data-model-id');
+                if (modelSelector) {
+                    updateModelSelector(modelId);
+                }
+                
+                // Update current model name
+                if (currentModelName) {
+                    if (modelId === '1') {
+                        currentModelName.textContent = 'Ruined Version';
+                    } else if (modelId === '2') {
+                        currentModelName.textContent = 'Glory Version';
+                    } else if (modelId === '3') {
+                        currentModelName.textContent = 'Historical Version';
+                    }
+                }
+                
+                // Show controls panel
+                controlsPanel.classList.add('expanded');
+            }
+            
+            // Add click handlers to all models
+            [modelContainer1, modelContainer2, modelContainer3].forEach(container => {
+                container.addEventListener('click', function(e) {
+                    // Get the model element within this container
+                    const modelElement = this.querySelector(`#model-${this.getAttribute('data-model-id')}`);
+                    if (modelElement) {
+                        selectModel(this, modelElement);
+                    }
+                });
+            });
+            
+            // Add event listeners for position controls
+            if (positionX) {
+                positionX.addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    positionXValue.textContent = value.toFixed(1);
+                    currentModelContainer.setAttribute('position', { 
+                        x: value, 
+                        y: parseFloat(positionY.value), 
+                        z: parseFloat(positionZ.value) 
+                    });
+                });
+            }
+            
+            if (positionY) {
+                positionY.addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    positionYValue.textContent = value.toFixed(1);
+                    currentModelContainer.setAttribute('position', { 
+                        x: parseFloat(positionX.value), 
+                        y: value, 
+                        z: parseFloat(positionZ.value) 
+                    });
+                });
+            }
+            
+            if (positionZ) {
+                positionZ.addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    positionZValue.textContent = value.toFixed(1);
+                    currentModelContainer.setAttribute('position', { 
+                        x: parseFloat(positionX.value), 
+                        y: parseFloat(positionY.value), 
+                        z: value 
+                    });
+                });
+            }
+            
+            // Add event listeners for rotation
+            if (rotationX) {
+                rotationX.addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    rotationXValue.textContent = value;
+                    currentModel.setAttribute('rotation', { 
+                        x: value, 
+                        y: parseFloat(rotationY.value), 
+                        z: parseFloat(rotationZ.value) 
+                    });
+                });
+            }
+            
+            if (rotationY) {
+                rotationY.addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    rotationYValue.textContent = value;
+                    currentModel.setAttribute('rotation', { 
+                        x: parseFloat(rotationX.value), 
+                        y: value, 
+                        z: parseFloat(rotationZ.value) 
+                    });
+                });
+            }
+            
+            if (rotationZ) {
+                rotationZ.addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    rotationZValue.textContent = value;
+                    currentModel.setAttribute('rotation', { 
+                        x: parseFloat(rotationX.value), 
+                        y: parseFloat(rotationY.value), 
+                        z: value 
+                    });
+                });
+            }
+            
+            // Add event listener for scale
+            if (scaleUniform) {
+                scaleUniform.addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    scaleUniformValue.textContent = value.toFixed(1);
+                    currentModel.setAttribute('scale', { x: value, y: value, z: value });
+                });
+            }
+            
+            // Add event to document to close model controls when clicking elsewhere
+            document.addEventListener('click', function(e) {
+                // If the click is outside the model and controls panel, close the panel
+                const isClickInsideControls = controlsPanel.contains(e.target) || 
+                                             controlsHeader.contains(e.target);
+                const isClickOnModel = e.target.closest('.clickable');
+                
+                if (!isClickInsideControls && !isClickOnModel && controlsPanel.classList.contains('expanded')) {
+                    controlsPanel.classList.remove('expanded');
+                }
+            });
+            
+            // Reset transform button
+            const resetTransformButton = document.getElementById('reset-transform-button');
+            if (resetTransformButton) {
+                resetTransformButton.addEventListener('click', function() {
+                    // Reset based on model ID
+                    const modelId = currentModelContainer.getAttribute('data-model-id');
+                    
+                    if (modelId === '1') {
+                        // Reset model 1 (Ruined version - front)
+                        currentModelContainer.setAttribute('position', { x: 0, y: 0, z: -4 });
+                        currentModel.setAttribute('rotation', { x: 0, y: 0, z: 0 });
+                    } else if (modelId === '2') {
+                        // Reset model 2 (Glory version - back left)
+                        currentModelContainer.setAttribute('position', { x: -3.5, y: 0, z: 2 });
+                        currentModel.setAttribute('rotation', { x: 0, y: 120, z: 0 });
+                    } else if (modelId === '3') {
+                        // Reset model 3 (Historical version - back right)
+                        currentModelContainer.setAttribute('position', { x: 3.5, y: 0, z: 2 });
+                        currentModel.setAttribute('rotation', { x: 0, y: 240, z: 0 });
+                    }
+                    
+                    // Reset scale for all models
+                    currentModel.setAttribute('scale', { x: 0.5, y: 0.5, z: 0.5 });
+                    
+                    // Update controls
+                    updateModelControls(currentModelContainer, currentModel);
+                });
+            }
+            
+            // Rotation animation controls
+            const autoRotateToggle = document.getElementById('auto-rotate-toggle');
+            if (autoRotateToggle) {
+                // Check if models are currently rotating
+                let isRotating = false;
+                
+                // Function to start rotation for the selected model
+                function startRotation() {
+                    currentModelContainer.emit('model-rotate-start');
+                    isRotating = true;
+                }
+                
+                // Function to stop rotation for the selected model
+                function stopRotation() {
+                    currentModelContainer.emit('model-rotate-stop');
+                    isRotating = false;
+                }
+                
+                // Add event listener to toggle
+                autoRotateToggle.addEventListener('change', function() {
+                    if (this.checked) {
+                        startRotation();
+                    } else {
+                        stopRotation();
+                    }
+                });
+                
+                // Update rotation state when model selection changes
+                document.addEventListener('model-selected', function() {
+                    autoRotateToggle.checked = isRotating;
+                });
+            }
+            
+            // Initial setup - show controls for the first model
+            updateModelControls(modelContainer1, model1);
+        });
+    </script>
 </body>
 </html>

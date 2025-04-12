@@ -1,6 +1,7 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const { networkInterfaces } = require('os');
 
 // Create a simple HTTPS server
 const options = {
@@ -8,7 +9,8 @@ const options = {
   cert: fs.readFileSync('cert.crt')
 };
 
-const PORT = 5000;
+// Port to listen on
+const PORT = 5001;
 
 const server = https.createServer(options, (req, res) => {
   // Set CORS headers to allow all origins and methods
@@ -94,12 +96,23 @@ const server = https.createServer(options, (req, res) => {
   });
 });
 
+// Start the server
 server.listen(PORT, () => {
   console.log(`\n✅ AR Blender Viewer Server running!`);
-  console.log(`\n📱 Access your AR application on your WiFi network at:`);
-  console.log(`   https://YOUR_IP_ADDRESS:${PORT}`);
-  console.log(`\n⚠️ Remember to accept the security warning in your browser`);
-  console.log(`   (This is normal for self-signed certificates)`);
-  console.log(`\n🔍 Look for your IP address using the 'ipconfig' command`);
+  
+  // Display all network interfaces
+  const interfaces = networkInterfaces();
+  console.log('\n📱 Your device can access this server at:');
+  
+  for (const iface of Object.values(interfaces)) {
+    for (const details of iface) {
+      if (details.family === 'IPv4' && !details.internal) {
+        console.log(`   https://${details.address}:${PORT}`);
+      }
+    }
+  }
+  
+  console.log(`\n🔍 If you can't see your IP address, use the 'ipconfig' command`);
   console.log(`\n🛑 Press Ctrl+C to stop the server`);
+  console.log('\n⚠️  Important: Accept the security certificate warning in your browser');
 });

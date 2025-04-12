@@ -1242,3 +1242,1406 @@ AFRAME.registerComponent('model-controls', {
         }
     }
 });
+
+// Camera initialization component
+AFRAME.registerComponent('camera-init', {
+    init: function() {
+        console.log('Initializing camera component');
+        
+        // Make sure we have access to the camera
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+                .then(function(stream) {
+                    console.log('Camera access granted successfully');
+                    
+                    // Stop the stream as AR.js will handle it
+                    stream.getTracks().forEach(function(track) {
+                        track.stop();
+                    });
+                    
+                    // Force the scene to be visible
+                    document.querySelector('a-scene').style.visibility = 'visible';
+                    document.querySelector('a-scene').style.display = 'block';
+                })
+                .catch(function(err) {
+                    console.error('Camera access error:', err);
+                });
+        } else {
+            console.error('MediaDevices API is not supported in this browser');
+        }
+    }
+});
+
+// AR.js camera visibility component
+AFRAME.registerComponent('arjs-camera-visibility', {
+    init: function() {
+        console.log('Initializing AR.js camera visibility component');
+        
+        // Wait for AR.js to initialize its video element
+        setTimeout(() => {
+            this.makeVideoVisible();
+        }, 2000);
+        
+        // Also listen for ar-initialize event
+        document.addEventListener('ar-initialize', () => {
+            console.log('AR initialize event received - ensuring video visibility');
+            setTimeout(() => {
+                this.makeVideoVisible();
+            }, 1000);
+        });
+    },
+    
+    makeVideoVisible: function() {
+        // Find AR.js video element
+        const arVideo = document.querySelector('#arjs-video');
+        if (arVideo) {
+            console.log('Making AR.js video visible');
+            arVideo.style.display = 'block';
+            arVideo.style.opacity = '1';
+            arVideo.style.position = 'absolute';
+            arVideo.style.top = '0';
+            arVideo.style.left = '0';
+            arVideo.style.width = '100%';
+            arVideo.style.height = '100%';
+            arVideo.style.objectFit = 'cover';
+            arVideo.style.zIndex = '1';
+            
+            // For debugging
+            console.log('AR.js video styles applied:', {
+                display: arVideo.style.display,
+                opacity: arVideo.style.opacity,
+                position: arVideo.style.position,
+                width: arVideo.style.width,
+                height: arVideo.style.height
+            });
+        } else {
+            console.warn('AR.js video element not found');
+            
+            // Check for other video elements that might be used by AR.js
+            const videos = document.querySelectorAll('video');
+            if (videos.length > 0) {
+                console.log('Found video elements:', videos.length);
+                videos.forEach((video, index) => {
+                    console.log(`Video ${index}:`, video.id, video.className);
+                });
+            }
+        }
+    }
+});
+
+// AR Components for Camera Access and Surface Detection
+
+// Direct camera access component to ensure camera feed is visible
+AFRAME.registerComponent('direct-camera-access', {
+    schema: {
+        width: {type: 'number', default: 1280},
+        height: {type: 'number', default: 720}
+    },
+    
+    init: function() {
+        console.log('Initializing direct camera access component');
+        this.videoEl = null;
+        this.stream = null;
+        this.attempts = 0;
+        this.maxAttempts = 5;
+        
+        // Store bound methods
+        this.initializeCamera = this.initializeCamera.bind(this);
+        this.tryEnablingCamera = this.tryEnablingCamera.bind(this);
+        this.forceStartCamera = this.forceStartCamera.bind(this);
+        
+        // Start camera after a short delay to ensure everything is ready
+        setTimeout(this.initializeCamera, 1000);
+        
+        // Add click handler that will try to enable camera again if needed
+        document.addEventListener('click', this.tryEnablingCamera);
+        
+        // Add a camera button to force start if needed
+        this.addCameraButton();
+        
+        // Additional event listeners for camera visibility
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && (!this.videoEl || !this.videoEl.srcObject)) {
+                console.log('Page became visible, ensuring camera is active');
+                this.initializeCamera();
+            }
+        });
+    },
+    
+    addCameraButton: function() {
+        // Add a floating camera button in case automatic initialization fails
+        let cameraBtn = document.getElementById('force-camera-button');
+        if (!cameraBtn) {
+            cameraBtn = document.createElement('button');
+            cameraBtn.id = 'force-camera-button';
+            cameraBtn.innerText = 'Start Camera';
+            cameraBtn.style.position = 'fixed';
+            cameraBtn.style.bottom = '80px';
+            cameraBtn.style.left = '50%';
+            cameraBtn.style.transform = 'translateX(-50%)';
+            cameraBtn.style.zIndex = '9999';
+            cameraBtn.style.padding = '10px 20px';
+            cameraBtn.style.backgroundColor = '#4361ee';
+            cameraBtn.style.color = 'white';
+            cameraBtn.style.border = 'none';
+            cameraBtn.style.borderRadius = '8px';
+            cameraBtn.style.fontSize = '16px';
+            cameraBtn.style.cursor = 'pointer';
+            
+            cameraBtn.addEventListener('click', this.forceStartCamera);
+            
+            document.body.appendChild(cameraBtn);
+        }
+    },
+    
+    forceStartCamera: function(e) {
+        if (e) e.preventDefault();
+        console.log('Force starting camera');
+        
+        // Reset attempts counter
+        this.attempts = 0;
+        
+        // Try with minimal constraints
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false
+            })
+            .then(stream => {
+                console.log('Camera force started successfully');
+                this.stream = stream;
+                window.cameraStream = stream;
+                
+                // Create or get video element
+                this.videoEl = document.querySelector('#arjs-video');
+                if (!this.videoEl) {
+                    this.videoEl = document.createElement('video');
+                    this.videoEl.id = 'arjs-video';
+                    this.videoEl.setAttribute('autoplay', '');
+                    this.videoEl.setAttribute('playsinline', '');
+                    this.videoEl.setAttribute('muted', '');
+                    document.body.appendChild(this.videoEl);
+                }
+                
+                // Configure video element
+                try {
+                    this.videoEl.srcObject = stream;
+                } catch (error) {
+                    console.error('Error setting srcObject:', error);
+                    this.videoEl.src = window.URL.createObjectURL(stream);
+                }
+                
+                this.videoEl.muted = true;
+                this.videoEl.play().then(() => {
+                    console.log('Video playing after force start');
+                    this.setupVideoVisibility();
+                }).catch(error => {
+                    console.error('Error playing video after force start:', error);
+                    // Try one more time with user interaction
+                    alert('Please tap OK to enable the camera');
+                    this.videoEl.play().catch(e => console.error('Final play error:', e));
+                });
+            })
+            .catch(error => {
+                console.error('Force start camera error:', error);
+                alert('Camera access denied. Please check your camera permissions in browser settings.');
+            });
+        }
+    },
+    
+    tryEnablingCamera: function() {
+        // Only try again if camera isn't already working
+        const arVideo = document.querySelector('#arjs-video');
+        if (!arVideo || !arVideo.srcObject || arVideo.paused) {
+            console.log('Attempting to enable camera on user interaction');
+            this.initializeCamera();
+        }
+    },
+    
+    initializeCamera: function() {
+        if (this.attempts >= this.maxAttempts) {
+            console.warn('Maximum camera initialization attempts reached');
+            this.showCameraError('Camera initialization failed after multiple attempts. Please reload the page.');
+            return;
+        }
+        
+        this.attempts++;
+        console.log(`Camera initialization attempt ${this.attempts}/${this.maxAttempts}`);
+        
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            // Try first with ideal constraints
+            const constraints = {
+                audio: false,
+                video: {
+                    facingMode: {ideal: 'environment'},
+                    width: { ideal: this.data.width },
+                    height: { ideal: this.data.height }
+                }
+            };
+            
+            console.log('Requesting camera access with constraints:', constraints);
+            
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(stream => {
+                    console.log('Camera access granted');
+                    this.stream = stream;
+                    window.cameraStream = stream; // Store globally for potential debug use
+                    
+                    // Create or get video element
+                    this.videoEl = document.querySelector('#arjs-video');
+                    if (!this.videoEl) {
+                        console.log('Creating new video element for camera feed');
+                        this.videoEl = document.createElement('video');
+                        this.videoEl.id = 'arjs-video';
+                        this.videoEl.setAttribute('autoplay', '');
+                        this.videoEl.setAttribute('playsinline', '');
+                        this.videoEl.setAttribute('muted', '');
+                        document.body.appendChild(this.videoEl);
+                    }
+                    
+                    // Configure video element
+                    try {
+                        this.videoEl.srcObject = stream;
+                    } catch (error) {
+                        console.error('Error setting srcObject:', error);
+                        // Fallback for older browsers
+                        this.videoEl.src = window.URL.createObjectURL(stream);
+                    }
+                    
+                    this.videoEl.onloadedmetadata = () => {
+                        // Ensure video plays
+                        const playPromise = this.videoEl.play();
+                        if (playPromise !== undefined) {
+                            playPromise
+                                .then(() => {
+                                    console.log('Camera video playing successfully');
+                                    this.setupVideoVisibility();
+                                })
+                                .catch(error => {
+                                    console.error('Error playing video:', error);
+                                    // Auto-play may be blocked, add a play button
+                                    this.addPlayButton();
+                                });
+                        } else {
+                            console.log('Play promise not supported, assuming video is playing');
+                            this.setupVideoVisibility();
+                        }
+                    };
+                    
+                    // Add error handler
+                    this.videoEl.onerror = (error) => {
+                        console.error('Video element error:', error);
+                        this.showCameraError('Video playback error. Please reload and try again.');
+                    };
+                    
+                    // Ensure video is muted to allow autoplay
+                    this.videoEl.muted = true;
+                })
+                .catch(error => {
+                    console.error('Error accessing camera with ideal constraints:', error);
+                    
+                    // Fall back to more permissive constraints
+                    const fallbackConstraints = {
+                        audio: false,
+                        video: true
+                    };
+                    
+                    console.log('Trying fallback constraints:', fallbackConstraints);
+                    
+                    navigator.mediaDevices.getUserMedia(fallbackConstraints)
+                        .then(stream => {
+                            console.log('Camera access granted with fallback constraints');
+                            this.stream = stream;
+                            window.cameraStream = stream;
+                            
+                            // Create or get video element (same as above)
+                            this.videoEl = document.querySelector('#arjs-video');
+                            if (!this.videoEl) {
+                                this.videoEl = document.createElement('video');
+                                this.videoEl.id = 'arjs-video';
+                                this.videoEl.setAttribute('autoplay', '');
+                                this.videoEl.setAttribute('playsinline', '');
+                                this.videoEl.setAttribute('muted', '');
+                                document.body.appendChild(this.videoEl);
+                            }
+                            
+                            // Configure video element
+                            try {
+                                this.videoEl.srcObject = stream;
+                            } catch (error) {
+                                this.videoEl.src = window.URL.createObjectURL(stream);
+                            }
+                            
+                            this.videoEl.onloadedmetadata = () => {
+                                const playPromise = this.videoEl.play();
+                                if (playPromise !== undefined) {
+                                    playPromise
+                                        .then(() => {
+                                            console.log('Camera video playing with fallback');
+                                            this.setupVideoVisibility();
+                                        })
+                                        .catch(error => {
+                                            console.error('Error playing fallback video:', error);
+                                            this.addPlayButton();
+                                        });
+                                } else {
+                                    this.setupVideoVisibility();
+                                }
+                            };
+                            
+                            this.videoEl.muted = true;
+                        })
+                        .catch(finalError => {
+                            console.error('All camera access attempts failed:', finalError);
+                            this.showCameraError('Camera access denied or not available. Please check permissions and try again.');
+                            
+                            // Try again with user interaction
+                            if (this.attempts < this.maxAttempts) {
+                                this.addCameraPermissionButton();
+                            }
+                        });
+                });
+        } else {
+            console.error('getUserMedia not supported');
+            this.showCameraError('Your browser doesn\'t support camera access. Please try a different browser.');
+        }
+    },
+    
+    setupVideoVisibility: function() {
+        if (!this.videoEl) return;
+        
+        // Make sure video is visible and properly styled
+        this.videoEl.style.display = 'block';
+        this.videoEl.style.position = 'absolute';
+        this.videoEl.style.top = '0';
+        this.videoEl.style.left = '0';
+        this.videoEl.style.width = '100%';
+        this.videoEl.style.height = '100%';
+        this.videoEl.style.objectFit = 'cover';
+        this.videoEl.style.zIndex = '1';
+        this.videoEl.style.opacity = '1';
+        
+        // Dispatch event to notify that camera is ready
+        document.dispatchEvent(new CustomEvent('camera-feed-active'));
+        
+        // Ensure AR.js can access this camera feed
+        const scene = document.querySelector('a-scene');
+        if (scene && scene.systems && scene.systems.arjs) {
+            console.log('Notifying AR.js system of camera feed');
+            scene.systems.arjs.arReady = true;
+            if (scene.systems.arjs._arSession && scene.systems.arjs._arSession.arSource) {
+                try {
+                    scene.systems.arjs._arSession.arSource.domElement = this.videoEl;
+                } catch (e) {
+                    console.error('Error connecting camera to AR.js:', e);
+                }
+            }
+        }
+        
+        console.log('Camera feed setup complete and active');
+    },
+    
+    addPlayButton: function() {
+        // Create a play button for browsers that block autoplay
+        let playButton = document.getElementById('camera-play-button');
+        if (!playButton) {
+            playButton = document.createElement('button');
+            playButton.id = 'camera-play-button';
+            playButton.innerText = 'Enable Camera';
+            playButton.style.position = 'fixed';
+            playButton.style.zIndex = '9999';
+            playButton.style.top = '50%';
+            playButton.style.left = '50%';
+            playButton.style.transform = 'translate(-50%, -50%)';
+            playButton.style.padding = '15px 30px';
+            playButton.style.backgroundColor = '#4361ee';
+            playButton.style.color = 'white';
+            playButton.style.border = 'none';
+            playButton.style.borderRadius = '8px';
+            playButton.style.fontSize = '16px';
+            playButton.style.cursor = 'pointer';
+            
+            playButton.onclick = () => {
+                if (this.videoEl) {
+                    const playPromise = this.videoEl.play();
+                    if (playPromise !== undefined) {
+                        playPromise
+                            .then(() => {
+                                console.log('Video playing after user interaction');
+                                playButton.remove();
+                                this.setupVideoVisibility();
+                            })
+                            .catch(error => {
+                                console.error('Still cannot play video after interaction:', error);
+                                this.showCameraError('Cannot enable camera. Please check permissions and reload.');
+                            });
+                    }
+                }
+            };
+            
+            document.body.appendChild(playButton);
+        }
+    },
+    
+    addCameraPermissionButton: function() {
+        let permButton = document.getElementById('camera-permission-button');
+        if (!permButton) {
+            permButton = document.createElement('button');
+            permButton.id = 'camera-permission-button';
+            permButton.innerText = 'Grant Camera Permission';
+            permButton.style.position = 'fixed';
+            permButton.style.zIndex = '9999';
+            permButton.style.top = '50%';
+            permButton.style.left = '50%';
+            permButton.style.transform = 'translate(-50%, -50%)';
+            permButton.style.padding = '15px 30px';
+            permButton.style.backgroundColor = '#4361ee';
+            permButton.style.color = 'white';
+            permButton.style.border = 'none';
+            permButton.style.borderRadius = '8px';
+            permButton.style.fontSize = '16px';
+            permButton.style.cursor = 'pointer';
+            
+            permButton.onclick = () => {
+                permButton.innerText = 'Requesting Permission...';
+                this.initializeCamera();
+                setTimeout(() => {
+                    permButton.remove();
+                }, 2000);
+            };
+            
+            document.body.appendChild(permButton);
+        }
+    },
+    
+    showCameraError: function(message) {
+        // Show error message to user
+        if (window.TimescapeExplorer && TimescapeExplorer.showNotification) {
+            TimescapeExplorer.showNotification(message, 8000);
+        }
+        
+        // Also show in console
+        console.error('Camera error:', message);
+        
+        // Show error message on screen
+        let errorMsg = document.getElementById('camera-error-message');
+        if (!errorMsg) {
+            errorMsg = document.createElement('div');
+            errorMsg.id = 'camera-error-message';
+            errorMsg.style.position = 'fixed';
+            errorMsg.style.top = '10px';
+            errorMsg.style.left = '50%';
+            errorMsg.style.transform = 'translateX(-50%)';
+            errorMsg.style.backgroundColor = 'rgba(220, 53, 69, 0.9)';
+            errorMsg.style.color = 'white';
+            errorMsg.style.padding = '10px 20px';
+            errorMsg.style.borderRadius = '8px';
+            errorMsg.style.zIndex = '10000';
+            errorMsg.style.maxWidth = '80%';
+            errorMsg.style.textAlign = 'center';
+            
+            document.body.appendChild(errorMsg);
+        }
+        
+        errorMsg.textContent = message;
+    },
+    
+    remove: function() {
+        // Clean up event listeners
+        document.removeEventListener('click', this.tryEnablingCamera);
+        
+        // Stop all tracks
+        if (this.stream) {
+            const tracks = this.stream.getTracks();
+            tracks.forEach(track => track.stop());
+        }
+        
+        // Remove any UI elements we created
+        const playButton = document.getElementById('camera-play-button');
+        if (playButton) playButton.remove();
+        
+        const permButton = document.getElementById('camera-permission-button');
+        if (permButton) permButton.remove();
+        
+        const errorMsg = document.getElementById('camera-error-message');
+        if (errorMsg) errorMsg.remove();
+    }
+});
+
+// Failsafe camera component
+AFRAME.registerComponent('failsafe-camera', {
+    init: function() {
+        console.log('Initializing failsafe camera component');
+        this.cameraEl = document.querySelector('#camera');
+        this.scene = this.el;
+        this.timeout = null;
+        this.cameraReady = false;
+        this.checkAttempts = 0;
+        this.maxCheckAttempts = 3;
+        
+        // Bind methods
+        this.checkCameraFeed = this.checkCameraFeed.bind(this);
+        this.reinitializeCamera = this.reinitializeCamera.bind(this);
+        this.createDebugCamera = this.createDebugCamera.bind(this);
+        
+        // Listen for camera-ready event
+        document.addEventListener('camera-ready', () => {
+            console.log('Camera ready event received');
+            this.cameraReady = true;
+        });
+        
+        document.addEventListener('camera-feed-active', () => {
+            console.log('Camera feed active event received');
+            this.cameraReady = true;
+            clearTimeout(this.timeout);
+        });
+        
+        // Start checking camera feed after initialization
+        this.timeout = setTimeout(this.checkCameraFeed, 5000);
+        
+        // Add periodic checks
+        setInterval(this.checkCameraFeed, 15000);
+    },
+    
+    checkCameraFeed: function() {
+        if (this.cameraReady) {
+            // Camera is ready, check if it's still working
+            const arVideo = document.querySelector('#arjs-video');
+            if (arVideo && arVideo.srcObject && !arVideo.paused) {
+                console.log('Camera feed is active and working');
+                return;
+            } else {
+                console.warn('Camera was ready but appears to have stopped working');
+                this.cameraReady = false;
+            }
+        }
+        
+        if (this.checkAttempts >= this.maxCheckAttempts) {
+            console.warn('Maximum camera check attempts reached');
+            
+            // Create a debug fallback
+            this.createDebugCamera();
+            return;
+        }
+        
+        console.log('Camera feed not detected, attempt', this.checkAttempts + 1, 'of', this.maxCheckAttempts);
+        this.checkAttempts++;
+        
+        // First, check if we have an active video element for AR.js
+        const arVideo = document.querySelector('#arjs-video');
+        const debugVideo = document.querySelector('#debug-video');
+        const backgroundVideo = document.getElementById('background-video');
+        
+        if (!arVideo || (arVideo && !arVideo.srcObject && !arVideo.src)) {
+            console.warn('AR.js video not properly initialized, attempting fixes');
+            
+            // Try AR.js alternative method first
+            const scene = document.querySelector('a-scene');
+            if (scene && scene.systems && scene.systems.arjs) {
+                console.log('Trying to restart AR.js camera');
+                
+                try {
+                    if (scene.systems.arjs._arSession && scene.systems.arjs._arSession.arSource) {
+                        const arSource = scene.systems.arjs._arSession.arSource;
+                        
+                        // Try to reinitialize the source
+                        if (typeof arSource.restart === 'function') {
+                            console.log('Restarting AR.js camera source');
+                            arSource.restart();
+                            
+                            // Check again after a short delay
+                            setTimeout(() => {
+                                const arVideo = document.querySelector('#arjs-video');
+                                if (arVideo && arVideo.srcObject) {
+                                    console.log('AR.js camera restart successful');
+                                    this.cameraReady = true;
+                                    document.dispatchEvent(new CustomEvent('camera-feed-active'));
+                                }
+                            }, 2000);
+                            
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error restarting AR.js camera:', e);
+                }
+            }
+            
+            // If we have a background video, try to use that
+            if (backgroundVideo && backgroundVideo.srcObject) {
+                console.log('Using background video as fallback');
+                
+                if (!arVideo) {
+                    arVideo = document.createElement('video');
+                    arVideo.id = 'arjs-video';
+                    arVideo.setAttribute('autoplay', '');
+                    arVideo.setAttribute('playsinline', '');
+                    arVideo.setAttribute('muted', '');
+                    document.body.appendChild(arVideo);
+                }
+                
+                try {
+                    arVideo.srcObject = backgroundVideo.srcObject;
+                    arVideo.play().then(() => {
+                        console.log('Background video repurposed for AR');
+                        document.dispatchEvent(new CustomEvent('camera-feed-active'));
+                        this.cameraReady = true;
+                    }).catch(e => {
+                        console.error('Error playing repurposed video:', e);
+                    });
+                    return;
+                } catch (e) {
+                    console.error('Error using background video as fallback:', e);
+                }
+            }
+            
+            // Try direct camera access as last resort
+            this.reinitializeCamera();
+        } else {
+            console.log('Camera element exists but may not be functioning correctly');
+            
+            // Check if video is paused and try to play it
+            if (arVideo.paused) {
+                console.log('Video is paused, attempting to play');
+                arVideo.play().then(() => {
+                    console.log('Successfully restarted video playback');
+                    this.cameraReady = true;
+                }).catch(e => {
+                    console.error('Error restarting video playback:', e);
+                    this.reinitializeCamera();
+                });
+            } else {
+                console.log('Video appears to be playing but not visible or functioning');
+                
+                // Ensure video is visible and properly styled
+                arVideo.style.display = 'block';
+                arVideo.style.position = 'absolute';
+                arVideo.style.top = '0';
+                arVideo.style.left = '0';
+                arVideo.style.width = '100%';
+                arVideo.style.height = '100%';
+                arVideo.style.objectFit = 'cover';
+                arVideo.style.zIndex = '1';
+                arVideo.style.opacity = '1';
+            }
+        }
+    },
+    
+    reinitializeCamera: function() {
+        console.log('Attempting to reinitialize camera');
+        
+        // Function to handle camera initialization
+        const tryCamera = (constraints) => {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                return navigator.mediaDevices.getUserMedia(constraints)
+                    .then(stream => {
+                        // Store stream for AR.js to use
+                        window.cameraStream = stream;
+                        
+                        // Create or get the video element
+                        let arVideo = document.querySelector('#arjs-video');
+                        if (!arVideo) {
+                            arVideo = document.createElement('video');
+                            arVideo.id = 'arjs-video';
+                            arVideo.setAttribute('autoplay', '');
+                            arVideo.setAttribute('playsinline', '');
+                            arVideo.setAttribute('muted', '');
+                            document.body.appendChild(arVideo);
+                        }
+                        
+                        // Set the stream
+                        try {
+                            arVideo.srcObject = stream;
+                        } catch (error) {
+                            arVideo.src = window.URL.createObjectURL(stream);
+                        }
+                        
+                        // Ensure video plays
+                        arVideo.muted = true;
+                        arVideo.onloadedmetadata = () => {
+                            arVideo.play().then(() => {
+                                console.log('Camera reinitialized and playing');
+                                
+                                // Style video element
+                                arVideo.style.display = 'block';
+                                arVideo.style.position = 'absolute';
+                                arVideo.style.top = '0';
+                                arVideo.style.left = '0';
+                                arVideo.style.width = '100%';
+                                arVideo.style.height = '100%';
+                                arVideo.style.objectFit = 'cover';
+                                arVideo.style.zIndex = '1';
+                                arVideo.style.opacity = '1';
+                                
+                                this.cameraReady = true;
+                                document.dispatchEvent(new CustomEvent('camera-feed-active'));
+                                
+                                // Connect to AR.js if available
+                                const scene = document.querySelector('a-scene');
+                                if (scene && scene.systems && scene.systems.arjs) {
+                                    try {
+                                        scene.systems.arjs.arReady = true;
+                                        if (scene.systems.arjs._arSession && scene.systems.arjs._arSession.arSource) {
+                                            scene.systems.arjs._arSession.arSource.domElement = arVideo;
+                                        }
+                                    } catch (e) {
+                                        console.error('Error connecting to AR.js:', e);
+                                    }
+                                }
+                            }).catch(error => {
+                                console.error('Error playing video after reinitialization:', error);
+                                document.addEventListener('click', () => {
+                                    arVideo.play().catch(e => console.error('Error on click play:', e));
+                                }, {once: true});
+                            });
+                        };
+                        
+                        return true;
+                    });
+            }
+            return Promise.reject('getUserMedia not supported');
+        };
+        
+        // Try first with environment camera
+        const constraints = {
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false
+        };
+        
+        tryCamera(constraints).catch(err => {
+            console.warn('Failed with environment camera, trying any camera:', err);
+            // Fall back to any camera
+            return tryCamera({ video: true, audio: false });
+        }).catch(err => {
+            console.error('All camera initialization attempts failed:', err);
+            // Create a debug camera as last resort
+            this.createDebugCamera();
+        });
+    },
+    
+    createDebugCamera: function() {
+        console.log('Creating debug camera fallback');
+        
+        // Create a debug video element that shows a static pattern or color
+        let debugVideo = document.querySelector('#debug-video');
+        if (!debugVideo) {
+            debugVideo = document.createElement('div');
+            debugVideo.id = 'debug-video';
+            debugVideo.style.position = 'absolute';
+            debugVideo.style.top = '0';
+            debugVideo.style.left = '0';
+            debugVideo.style.width = '100%';
+            debugVideo.style.height = '100%';
+            debugVideo.style.backgroundColor = '#333';
+            debugVideo.style.zIndex = '1';
+            
+            // Add a pattern
+            debugVideo.style.backgroundImage = 'linear-gradient(45deg, #444 25%, transparent 25%), linear-gradient(-45deg, #444 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #444 75%), linear-gradient(-45deg, transparent 75%, #444 75%)';
+            debugVideo.style.backgroundSize = '20px 20px';
+            debugVideo.style.backgroundPosition = '0 0, 0 10px, 10px -10px, -10px 0px';
+            
+            document.body.appendChild(debugVideo);
+        } else {
+            debugVideo.style.display = 'block';
+        }
+        
+        // Show a message to the user
+        const errorMessage = document.createElement('div');
+        errorMessage.style.position = 'absolute';
+        errorMessage.style.top = '50%';
+        errorMessage.style.left = '50%';
+        errorMessage.style.transform = 'translate(-50%, -50%)';
+        errorMessage.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        errorMessage.style.color = 'white';
+        errorMessage.style.padding = '20px';
+        errorMessage.style.borderRadius = '10px';
+        errorMessage.style.maxWidth = '80%';
+        errorMessage.style.textAlign = 'center';
+        errorMessage.style.zIndex = '100';
+        errorMessage.innerHTML = `
+            <h3 style="margin-top: 0;">Camera Access Failed</h3>
+            <p>Unable to access your camera. The application will continue in debug mode with limited functionality.</p>
+            <button id="retry-camera" style="background-color: #4361ee; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px;">Retry Camera Access</button>
+        `;
+        
+        document.body.appendChild(errorMessage);
+        
+        // Add event listener to retry button
+        const retryButton = document.getElementById('retry-camera');
+        if (retryButton) {
+            retryButton.addEventListener('click', () => {
+                errorMessage.remove();
+                this.checkAttempts = 0;
+                this.reinitializeCamera();
+            });
+        }
+        
+        // Try to continue with the application despite no camera
+        setTimeout(() => {
+            document.dispatchEvent(new CustomEvent('camera-feed-active'));
+        }, 1000);
+    }
+});
+
+// AR.js camera visibility component
+AFRAME.registerComponent('arjs-camera-visibility', {
+    init: function() {
+        // Wait for AR.js to initialize
+        setTimeout(() => {
+            const arjsVideo = document.querySelector('#arjs-video');
+            if (arjsVideo) {
+                console.log('Found AR.js video element, ensuring visibility');
+                arjsVideo.style.display = 'block';
+                arjsVideo.style.opacity = '1';
+                arjsVideo.style.visibility = 'visible';
+                arjsVideo.style.position = 'absolute';
+                arjsVideo.style.top = '0';
+                arjsVideo.style.left = '0';
+                arjsVideo.style.width = '100%';
+                arjsVideo.style.height = '100%';
+                arjsVideo.style.objectFit = 'cover';
+                arjsVideo.style.zIndex = '1';
+            } else {
+                console.warn('AR.js video element not found, camera may not be visible');
+            }
+        }, 2000);
+    }
+});
+
+// Camera initialization component
+AFRAME.registerComponent('camera-init', {
+    init: function() {
+        console.log('Camera init component started');
+        
+        // Ensure camera entity has correct attributes
+        this.el.setAttribute('look-controls', {
+            magicWindowTrackingEnabled: true,
+            pointerLockEnabled: false,
+            reverseMouseDrag: false
+        });
+        
+        // Make sure camera is positioned correctly
+        if (!this.el.getAttribute('position')) {
+            this.el.setAttribute('position', {x: 0, y: 1.6, z: 0});
+        }
+    }
+});
+
+// AR Scene Manager
+AFRAME.registerComponent('ar-scene-manager', {
+    init: function() {
+        console.log('AR Scene Manager initialized');
+        
+        // Hide loading screen after initial load
+        setTimeout(() => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 500);
+            }
+        }, 2000);
+    }
+});
+
+// Component to handle fixed model placement in AR space
+AFRAME.registerComponent('fixed-model-placement', {
+    schema: {
+        modelSelector: {type: 'string', default: '#model-container'},
+        placementIndicatorId: {type: 'string', default: 'placement-prompt'},
+        notificationDuration: {type: 'number', default: 3000}
+    },
+    
+    init: function() {
+        // Get DOM elements
+        this.camera = document.querySelector('#camera');
+        this.modelContainer1 = document.querySelector('#model-container-1');
+        this.modelContainer2 = document.querySelector('#model-container-2');
+        this.modelContainer3 = document.querySelector('#model-container-3');
+        this.placementIndicator = document.getElementById(this.data.placementIndicatorId);
+        this.debugStateElement = document.getElementById('debug-state');
+        
+        // Set initial state
+        this.isModelPlaced = false;
+        
+        // Log initialization and update debug display
+        console.log('Fixed model placement initialized', this.camera ? 'Camera found' : 'Camera missing', 
+                    this.modelContainer1 ? 'Model 1 found' : 'Model 1 missing',
+                    this.modelContainer2 ? 'Model 2 found' : 'Model 2 missing',
+                    this.modelContainer3 ? 'Model 3 found' : 'Model 3 missing');
+        this.updateDebugState('Ready - Click to place models');
+        
+        // Make placement indicator visible
+        if (this.placementIndicator) {
+            this.placementIndicator.style.display = 'block';
+            this.placementIndicator.style.opacity = '1';
+            this.placementIndicator.classList.remove('hidden');
+        }
+        
+        // Set up click listener for model placement
+        this.onClickBound = this.onClick.bind(this);
+        document.addEventListener('click', this.onClickBound);
+        
+        // Set the models to follow camera position immediately
+        this.positionModelsInFrontOfCamera();
+    },
+    
+    tick: function() {
+        // Only update position when not placed
+        if (!this.isModelPlaced) {
+            this.positionModelsInFrontOfCamera();
+        }
+    },
+    
+    positionModelsInFrontOfCamera: function() {
+        if (!this.camera || !this.modelContainer1 || !this.modelContainer2 || !this.modelContainer3) return;
+        
+        try {
+            // Get camera position and rotation
+            const cameraPosition = this.camera.getAttribute('position');
+            const cameraRotation = this.camera.getAttribute('rotation');
+            
+            // Convert Y rotation to radians for math calculations
+            const rotationYRad = THREE.MathUtils.degToRad(cameraRotation.y);
+            
+            // Calculate positions in triangular formation
+            // Model 1 - In front of user
+            const distance1 = 4.0;
+            const x1 = cameraPosition.x - Math.sin(rotationYRad) * distance1;
+            const z1 = cameraPosition.z - Math.cos(rotationYRad) * distance1;
+            
+            // Model 2 - Back left from user's perspective
+            const distance2 = 4.0;
+            const angle2 = rotationYRad + Math.PI * 0.666; // ~120 degrees
+            const x2 = cameraPosition.x - Math.sin(angle2) * distance2;
+            const z2 = cameraPosition.z - Math.cos(angle2) * distance2;
+            
+            // Model 3 - Back right from user's perspective
+            const distance3 = 4.0;
+            const angle3 = rotationYRad - Math.PI * 0.666; // ~-120 degrees
+            const x3 = cameraPosition.x - Math.sin(angle3) * distance3;
+            const z3 = cameraPosition.z - Math.cos(angle3) * distance3;
+            
+            // Set model positions (at eye level - slightly lower)
+            const modelY = Math.max(0.5, cameraPosition.y - 0.5);
+            
+            // Position model 1 (front)
+            this.modelContainer1.setAttribute('position', {
+                x: x1,
+                y: modelY,
+                z: z1
+            });
+            
+            // Position model 2 (back left)
+            this.modelContainer2.setAttribute('position', {
+                x: x2,
+                y: modelY,
+                z: z2
+            });
+            
+            // Position model 3 (back right)
+            this.modelContainer3.setAttribute('position', {
+                x: x3,
+                y: modelY,
+                z: z3
+            });
+            
+            // Set model rotations to face the center
+            this.modelContainer1.setAttribute('rotation', {
+                x: 0,
+                y: cameraRotation.y,
+                z: 0
+            });
+            
+            this.modelContainer2.setAttribute('rotation', {
+                x: 0,
+                y: cameraRotation.y + 120,
+                z: 0
+            });
+            
+            this.modelContainer3.setAttribute('rotation', {
+                x: 0,
+                y: cameraRotation.y - 120,
+                z: 0
+            });
+            
+            // Ensure models are visible
+            this.modelContainer1.setAttribute('visible', true);
+            this.modelContainer2.setAttribute('visible', true);
+            this.modelContainer3.setAttribute('visible', true);
+        } catch (err) {
+            console.error('Error positioning models:', err);
+        }
+    },
+    
+    onClick: function(event) {
+        // Check if already placed
+        if (this.isModelPlaced) return;
+        
+        console.log('Tap detected - placing models');
+        this.updateDebugState('Models placed');
+        
+        // Mark as placed so it stops following the camera
+        this.isModelPlaced = true;
+        
+        // Hide the placement indicator
+        if (this.placementIndicator) {
+            this.placementIndicator.classList.add('hidden');
+        }
+        
+        // Start rotation animations
+        this.startRotationAnimations();
+        
+        // Show success notification
+        this.showNotification('Models placed in triangle formation. You can rotate to see them all.');
+        
+        // Dispatch event for other components
+        const placedEvent = new CustomEvent('model-placed');
+        window.dispatchEvent(placedEvent);
+        
+        // Make simple controls visible
+        const simpleControls = document.getElementById('simple-controls');
+        if (simpleControls) {
+            simpleControls.classList.remove('hidden');
+        }
+    },
+    
+    startRotationAnimations: function() {
+        // Start animation for each model
+        if (this.modelContainer1) {
+            this.modelContainer1.emit('model-rotate-start');
+        }
+        if (this.modelContainer2) {
+            this.modelContainer2.emit('model-rotate-start');
+        }
+        if (this.modelContainer3) {
+            this.modelContainer3.emit('model-rotate-start');
+        }
+    },
+    
+    resetPlacement: function() {
+        console.log('Resetting model placement');
+        this.updateDebugState('Reset - Following camera');
+        
+        // Reset placement state
+        this.isModelPlaced = false;
+        
+        // Stop animations
+        if (this.modelContainer1) {
+            this.modelContainer1.emit('model-rotate-stop');
+        }
+        if (this.modelContainer2) {
+            this.modelContainer2.emit('model-rotate-stop');
+        }
+        if (this.modelContainer3) {
+            this.modelContainer3.emit('model-rotate-stop');
+        }
+        
+        // Reset model positions and rotations
+        this.positionModelsInFrontOfCamera();
+        
+        // Show placement indicator again
+        if (this.placementIndicator) {
+            this.placementIndicator.style.display = 'block';
+            this.placementIndicator.classList.remove('hidden');
+        }
+        
+        // Hide simple controls
+        const simpleControls = document.getElementById('simple-controls');
+        if (simpleControls) {
+            simpleControls.classList.add('hidden');
+        }
+        
+        // Show notification
+        this.showNotification('Tap to place the models');
+        
+        // Dispatch reset event
+        window.dispatchEvent(new CustomEvent('model-reset'));
+    },
+    
+    showNotification: function(message) {
+        // Show notification using UIManager if available
+        if (window.UIManager && UIManager.showNotification) {
+            UIManager.showNotification(message, this.data.notificationDuration);
+        } else {
+            // Fallback to basic notification
+            const notification = document.getElementById('notification');
+            if (notification) {
+                notification.textContent = message;
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, this.data.notificationDuration);
+            }
+        }
+    },
+    
+    updateDebugState: function(state) {
+        if (this.debugStateElement) {
+            this.debugStateElement.textContent = state;
+        }
+    },
+    
+    remove: function() {
+        // Clean up event listeners
+        document.removeEventListener('click', this.onClickBound);
+    }
+});
+
+// Model Loader Debug Component - Ensures models load properly and are placed correctly
+AFRAME.registerComponent('model-loader-debug', {
+    schema: {
+        model1: {type: 'selector', default: '#model-1'},
+        model2: {type: 'selector', default: '#model-2'},
+        model3: {type: 'selector', default: '#model-3'},
+        container1: {type: 'selector', default: '#model-container-1'},
+        container2: {type: 'selector', default: '#model-container-2'},
+        container3: {type: 'selector', default: '#model-container-3'}
+    },
+    
+    init: function() {
+        console.log('Model loader debug component initialized');
+        
+        // Keep track of loaded models
+        this.loadedModels = {
+            model1: false,
+            model2: false,
+            model3: false
+        };
+        
+        // Bind methods
+        this.checkModelLoading = this.checkModelLoading.bind(this);
+        this.forceReloadModel = this.forceReloadModel.bind(this);
+        this.setupModelPositions = this.setupModelPositions.bind(this);
+        
+        // Register event listeners for model loading
+        if (this.data.model1) {
+            this.data.model1.addEventListener('model-loaded', () => {
+                console.log('Model 1 loaded successfully');
+                this.loadedModels.model1 = true;
+                this.ensureModelVisible(this.data.model1);
+            });
+            
+            this.data.model1.addEventListener('model-error', (e) => {
+                console.error('Error loading Model 1:', e.detail);
+                this.forceReloadModel(this.data.model1, './models/model1.glb');
+            });
+        }
+        
+        if (this.data.model2) {
+            this.data.model2.addEventListener('model-loaded', () => {
+                console.log('Model 2 loaded successfully');
+                this.loadedModels.model2 = true;
+                this.ensureModelVisible(this.data.model2);
+            });
+            
+            this.data.model2.addEventListener('model-error', (e) => {
+                console.error('Error loading Model 2:', e.detail);
+                this.forceReloadModel(this.data.model2, './models/model2.glb');
+            });
+        }
+        
+        if (this.data.model3) {
+            this.data.model3.addEventListener('model-loaded', () => {
+                console.log('Model 3 loaded successfully');
+                this.loadedModels.model3 = true;
+                this.ensureModelVisible(this.data.model3);
+            });
+            
+            this.data.model3.addEventListener('model-error', (e) => {
+                console.error('Error loading Model 3:', e.detail);
+                this.forceReloadModel(this.data.model3, './models/model3.glb');
+            });
+        }
+        
+        // Check model loading status after a delay
+        setTimeout(this.checkModelLoading, 5000);
+        
+        // Camera ready listener
+        document.addEventListener('camera-feed-active', () => {
+            console.log('Camera ready, setting up model positions');
+            this.setupModelPositions();
+        });
+    },
+    
+    checkModelLoading: function() {
+        console.log('Checking model loading status');
+        
+        // Check each model for loading status
+        if (!this.loadedModels.model1 && this.data.model1) {
+            console.log('Model 1 not loaded yet, forcing reload');
+            this.forceReloadModel(this.data.model1, './models/model1.glb');
+        }
+        
+        if (!this.loadedModels.model2 && this.data.model2) {
+            console.log('Model 2 not loaded yet, forcing reload');
+            this.forceReloadModel(this.data.model2, './models/model2.glb');
+        }
+        
+        if (!this.loadedModels.model3 && this.data.model3) {
+            console.log('Model 3 not loaded yet, forcing reload');
+            this.forceReloadModel(this.data.model3, './models/model3.glb');
+        }
+        
+        // Check one last time after a delay
+        setTimeout(() => {
+            let allLoaded = this.loadedModels.model1 && this.loadedModels.model2 && this.loadedModels.model3;
+            console.log('All models loaded:', allLoaded);
+            
+            if (!allLoaded) {
+                console.warn('Some models failed to load, deploying fallback strategy');
+                this.deployFallbackStrategy();
+            }
+        }, 10000);
+    },
+    
+    forceReloadModel: function(modelEl, src) {
+        if (!modelEl) return;
+        
+        // Try removing and re-adding the model
+        console.log(`Force reloading model from ${src}`);
+        
+        // First remove the model
+        modelEl.removeAttribute('gltf-model');
+        
+        // Wait a moment before re-adding
+        setTimeout(() => {
+            // Re-add with cache-busting
+            const cacheBuster = `?t=${Date.now()}`;
+            modelEl.setAttribute('gltf-model', src + cacheBuster);
+            
+            // Make sure model is visible
+            modelEl.setAttribute('visible', true);
+        }, 1000);
+    },
+    
+    ensureModelVisible: function(modelEl) {
+        if (!modelEl) return;
+        
+        // Make sure model and all its meshes are visible
+        modelEl.setAttribute('visible', true);
+        
+        // Get the 3D object
+        const obj3D = modelEl.object3D;
+        if (obj3D) {
+            obj3D.visible = true;
+            
+            // Make all child meshes visible and disable frustum culling
+            obj3D.traverse((node) => {
+                if (node.isMesh) {
+                    node.visible = true;
+                    node.frustumCulled = false;
+                }
+            });
+        }
+    },
+    
+    setupModelPositions: function() {
+        console.log('Setting up fixed model positions');
+        
+        // Set fixed positions for the models
+        if (this.data.container1) {
+            console.log('Setting Model 1 position (front)');
+            this.data.container1.setAttribute('position', {x: 0, y: 0, z: -4});
+            // Inner model rotation
+            if (this.data.model1) {
+                this.data.model1.setAttribute('rotation', {x: 0, y: 0, z: 0});
+            }
+        }
+        
+        if (this.data.container2) {
+            console.log('Setting Model 2 position (back left)');
+            this.data.container2.setAttribute('position', {x: -3.5, y: 0, z: 2});
+            // Inner model rotation
+            if (this.data.model2) {
+                this.data.model2.setAttribute('rotation', {x: 0, y: 120, z: 0});
+            }
+        }
+        
+        if (this.data.container3) {
+            console.log('Setting Model 3 position (back right)');
+            this.data.container3.setAttribute('position', {x: 3.5, y: 0, z: 2});
+            // Inner model rotation
+            if (this.data.model3) {
+                this.data.model3.setAttribute('rotation', {x: 0, y: 240, z: 0});
+            }
+        }
+    },
+    
+    deployFallbackStrategy: function() {
+        console.log('Deploying fallback strategy for model loading');
+        
+        // Fallback: Try using object models if GLB fails
+        if (!this.loadedModels.model1 && this.data.model1) {
+            console.log('Trying OBJ format for Model 1');
+            this.data.model1.setAttribute('obj-model', 'obj: ./models/model1.obj');
+        }
+        
+        if (!this.loadedModels.model2 && this.data.model2) {
+            console.log('Trying OBJ format for Model 2');
+            this.data.model2.setAttribute('obj-model', 'obj: ./models/model2.obj');
+        }
+        
+        if (!this.loadedModels.model3 && this.data.model3) {
+            console.log('Trying OBJ format for Model 3');
+            this.data.model3.setAttribute('obj-model', 'obj: ./models/model3.obj');
+        }
+        
+        // Final check - if all else fails, create simple geometry placeholders
+        setTimeout(() => {
+            if (!this.loadedModels.model1 && this.data.model1) {
+                this.createPlaceholder(this.data.model1, 'red');
+            }
+            if (!this.loadedModels.model2 && this.data.model2) {
+                this.createPlaceholder(this.data.model2, 'green');
+            }
+            if (!this.loadedModels.model3 && this.data.model3) {
+                this.createPlaceholder(this.data.model3, 'blue');
+            }
+        }, 5000);
+    },
+    
+    createPlaceholder: function(modelEl, color) {
+        console.log(`Creating placeholder for model with color ${color}`);
+        
+        // Remove any previous model attributes
+        modelEl.removeAttribute('gltf-model');
+        modelEl.removeAttribute('obj-model');
+        
+        // Create a simple box as placeholder
+        const box = document.createElement('a-box');
+        box.setAttribute('color', color);
+        box.setAttribute('width', 1);
+        box.setAttribute('height', 1);
+        box.setAttribute('depth', 1);
+        
+        // Clear any existing children
+        while (modelEl.firstChild) {
+            modelEl.removeChild(modelEl.firstChild);
+        }
+        
+        // Add the placeholder box
+        modelEl.appendChild(box);
+    },
+    
+    tick: function() {
+        // Periodically check if models are visible
+        if (this.el.sceneEl.time % 1000 < 10) { // Check roughly every second
+            if (this.loadedModels.model1 && this.data.model1) {
+                this.ensureModelVisible(this.data.model1);
+            }
+            if (this.loadedModels.model2 && this.data.model2) {
+                this.ensureModelVisible(this.data.model2);
+            }
+            if (this.loadedModels.model3 && this.data.model3) {
+                this.ensureModelVisible(this.data.model3);
+            }
+        }
+    }
+});

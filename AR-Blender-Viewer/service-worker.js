@@ -15,51 +15,58 @@ const urlsToCache = [
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css'
 ];
 
-// Install event - cache assets
+// Cache files
+const filesToCache = [
+  './',
+  './index.html',
+  './js/main.js',
+  './js/ar-components.js',
+  './css/styles.css',
+  './models/model1.glb',
+  './models/model2.glb',
+  './models/model3.glb',
+  './img/shadow.png'
+];
+
+// Install event - cache files
 self.addEventListener('install', event => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('Opened cache');
-                return cache.addAll(urlsToCache);
-            })
-    );
+  console.log('[Service Worker] Installing...');
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('[Service Worker] Caching files');
+        return cache.addAll(filesToCache);
+      })
+  );
 });
 
-// Fetch event - serve from cache if available
+// Special handling for GLB files
 self.addEventListener('fetch', event => {
+  if (event.request.url.endsWith('.glb') || event.request.url.endsWith('.gltf')) {
+    // For 3D model files, use network first, then cache
     event.respondWith(
-        caches.match(event.request)
-            .then(response => {
-                // Cache hit - return the response
-                if (response) {
-                    return response;
-                }
-                
-                // Clone the request
-                const fetchRequest = event.request.clone();
-                
-                return fetch(fetchRequest).then(
-                    response => {
-                        // Check if valid response
-                        if (!response || response.status !== 200 || response.type !== 'basic') {
-                            return response;
-                        }
-                        
-                        // Clone the response
-                        const responseToCache = response.clone();
-                        
-                        // Add to cache
-                        caches.open(CACHE_NAME)
-                            .then(cache => {
-                                cache.put(event.request, responseToCache);
-                            });
-                        
-                        return response;
-                    }
-                );
-            })
+      fetch(event.request)
+        .then(response => {
+          // Clone the response to store in cache
+          const clonedResponse = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, clonedResponse);
+          });
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request);
+        })
     );
+  } else {
+    // For other resources, use cache first, then network
+    event.respondWith(
+      caches.match(event.request)
+        .then(response => {
+          return response || fetch(event.request);
+        })
+    );
+  }
 });
 
 // Activate event - clean up old caches
