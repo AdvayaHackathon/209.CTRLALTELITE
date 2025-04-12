@@ -57,7 +57,7 @@ const AttractionOptions = ({ options }: AttractionOptionsProps) => {
               </div>
               <div className="flex items-center gap-1 text-yellow-400">
                 <FaStar size={14} />
-                <span>{attraction.rating.toFixed(1)}</span>
+                {/* <span>{attraction.rating.toFixed(1)}</span> */}
               </div>
             </div>
             

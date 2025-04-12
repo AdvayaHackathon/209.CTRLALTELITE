@@ -174,26 +174,26 @@ const TravelPlanner = () => {
             disabled={isLoading}
           >
             {isLoading ? (
-              <ClipLoader size={24} color="#3B82F6" />
+              <ClipLoader size={24} color="#0F3460" />
             ) : (
               <FaSearch className="text-xl" />
             )}
           </button>
         </div>
         {userLocation && (
-          <div className="mt-2 text-sm text-gray-600 flex items-center justify-between">
+          <div className="mt-2 text-sm text-dark flex items-center justify-between">
             <div className="flex items-center">
-              <FaMapMarkerAlt className="text-red-500 mr-2" />
-              <span className="text-gray-600">
+              <FaMapMarkerAlt className="text-secondary mr-2" />
+              <span className="text-dark">
                 Planning from: {showManualLocation ? manualLocation : userLocation}
-                {locationError && <span className="ml-1 text-amber-600"> ({locationError})</span>}
+                {locationError && <span className="ml-1 text-accent"> ({locationError})</span>}
               </span>
             </div>
             <div className="flex items-center space-x-2">
               <button 
                 type="button"
                 onClick={() => setShowManualLocation(!showManualLocation)}
-                className="text-blue-500 hover:text-blue-700 text-xs flex items-center"
+                className="text-primary hover:text-dark text-xs flex items-center"
               >
                 {showManualLocation ? "Use Detected" : "Enter Manually"}
               </button>
@@ -206,7 +206,7 @@ const TravelPlanner = () => {
                   document.dispatchEvent(new Event('refreshlocation'));
                   setShowManualLocation(false);
                 }}
-                className="text-blue-500 hover:text-blue-700 text-xs flex items-center"
+                className="text-primary hover:text-dark text-xs flex items-center"
               >
                 <FaLocationArrow className="mr-1" />
                 Refresh Location
@@ -235,7 +235,7 @@ const TravelPlanner = () => {
                   }
                 }}
                 placeholder="Enter your location"
-                className="w-full px-3 py-1 border border-gray-300 rounded text-sm"
+                className="w-full px-3 py-1 border border-tan-200 rounded text-sm bg-tan-100"
               />
               <button
                 type="button"
@@ -250,7 +250,7 @@ const TravelPlanner = () => {
                     }
                   }
                 }}
-                className="ml-2 bg-blue-500 text-white px-2 py-1 rounded text-xs"
+                className="ml-2 bg-primary text-white px-2 py-1 rounded text-xs"
               >
                 Use
               </button>
@@ -264,8 +264,8 @@ const TravelPlanner = () => {
 
       {/* Only show chatbot initially */}
       {!travelData && !isGenerating && (
-        <div className="mt-8 p-6 bg-blue-50 rounded-lg shadow-sm">
-          <p className="text-center text-gray-700">
+        <div className="mt-8 p-6 bg-tan-100 rounded-lg shadow-sm border border-tan-200">
+          <p className="text-center text-dark">
             Welcome to the AI Travel Planner! Enter a destination above to get detailed travel information.
           </p>
         </div>
@@ -274,13 +274,13 @@ const TravelPlanner = () => {
       {/* Show travel options only after destination is entered */}
       {travelData && !isGenerating && (
         <div className="mt-8">
-          <h2 className="text-2xl font-semibold mb-2 text-center">
+          <h2 className="text-2xl font-heading font-semibold mb-2 text-center text-primary">
             Your Travel Plan for {travelData.destination}
           </h2>
           
           {/* Display destination description */}
-          <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
-            <p className="text-gray-700">{travelData.description}</p>
+          <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border border-tan-200">
+            <p className="text-dark">{travelData.description}</p>
           </div>
           
           {/* Virtual location QR code */}
@@ -371,16 +371,16 @@ const OptionCard = ({
   children,
 }: OptionCardProps) => {
   return (
-    <div className="card transition-all duration-300">
+    <div className="card transition-all duration-300 hover:border-primary">
       <div
         className="flex items-center justify-between cursor-pointer"
         onClick={onClick}
       >
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-gray-50 rounded-full">{icon}</div>
+          <div className="p-3 bg-tan-100 rounded-full text-primary">{icon}</div>
           <div>
-            <h3 className="text-xl font-semibold">{title}</h3>
-            <p className="text-gray-600">{description}</p>
+            <h3 className="text-xl font-heading font-semibold text-primary">{title}</h3>
+            <p className="text-dark">{description}</p>
           </div>
         </div>
         <button className="text-primary">
@@ -417,7 +417,7 @@ const OptionCard = ({
           )}
         </button>
       </div>
-      {isExpanded && <div className="mt-6">{children}</div>}
+      {isExpanded && <div className="mt-6 border-t border-tan-200 pt-4">{children}</div>}
     </div>
   );
 };

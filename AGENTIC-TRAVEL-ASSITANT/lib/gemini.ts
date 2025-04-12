@@ -86,12 +86,12 @@ function generatePromptForDestination(destination: string): string {
         // For remote or isolated places with no airports, return an empty array
         {
           "type": "Flight",
-          "provider": "Actual airline that serves this route (e.g., IndiGo, Air India)",
-          "price": "Realistic price in Indian Rupees (₹) based on current market rates",
-          "duration": "Realistic flight duration",
-          "departureTime": "Common departure time",
-          "arrivalTime": "Arrival time based on duration",
-          "details": "Route details, aircraft type, facilities",
+          "provider": "Actual airline that serves this route (e.g., IndiGo, Air India, Vistara, SpiceJet)",
+          "price": "Realistic price in Indian Rupees (₹) based on current market rates for economy class",
+          "duration": "Realistic flight duration in hours and minutes",
+          "departureTime": "Common departure time (e.g., '10:30 AM')",
+          "arrivalTime": "Arrival time based on duration (e.g., '12:45 PM')",
+          "details": "Route details including stops if not direct, aircraft type, frequency (e.g., 'Daily', 'Tue, Thu, Sat')",
           "bookingUrl": "Official URL of the airline's website (e.g., https://www.goindigo.in, https://www.airindia.in)"
         }
       ],
@@ -100,24 +100,24 @@ function generatePromptForDestination(destination: string): string {
         // For places without rail connections, return an empty array
         {
           "type": "Train",
-          "provider": "Actual train service name (e.g., Rajdhani Express, Shatabdi)",
-          "price": "Realistic price in Indian Rupees (₹) for common class",
-          "duration": "Realistic travel duration",
-          "departureTime": "Common departure time",
+          "provider": "Actual train service name with train number (e.g., 'Rajdhani Express (12301)', 'Shatabdi Express (12026)')",
+          "price": "Realistic price in Indian Rupees (₹) with class specified (e.g., '₹1,200 (Sleeper)', '₹2,400 (AC 3-Tier)')",
+          "duration": "Realistic travel duration in hours and minutes",
+          "departureTime": "Common departure time from major stations",
           "arrivalTime": "Arrival time based on duration",
-          "details": "Train number, frequency, classes available",
+          "details": "Train frequency, classes available, route information, amenities",
           "bookingUrl": "https://www.irctc.co.in"
         }
       ],
       "buses": [
         {
           "type": "Bus",
-          "provider": "Actual bus service provider for this route (e.g., KSRTC, RedBus, private operator)",
-          "price": "Realistic price in Indian Rupees (₹)",
-          "duration": "Realistic travel duration",
-          "departureTime": "Common departure time",
+          "provider": "Actual bus service provider for this route (e.g., KSRTC, MSRTC, RedBus, Intercity operators)",
+          "price": "Realistic price in Indian Rupees (₹) with bus type (e.g., '₹800 (AC Sleeper)', '₹500 (Non-AC Seater)')",
+          "duration": "Realistic travel duration in hours and minutes including typical traffic conditions",
+          "departureTime": "Common departure time from major bus stations",
           "arrivalTime": "Arrival time based on duration",
-          "details": "Bus type, frequency, facilities",
+          "details": "Bus type (AC/Non-AC, Sleeper/Seater), frequency, onboard facilities, departure location",
           "bookingUrl": "Official URL of the bus provider (e.g., https://www.redbus.in, https://ksrtc.in)"
         }
       ]
@@ -125,107 +125,124 @@ function generatePromptForDestination(destination: string): string {
     "lodgingOptions": {
       "hotels": [
         {
-          "name": "Real hotel name near ${destination}",
-          "type": "Hotel",
-          "price": "Realistic price per night in Indian Rupees (₹)",
-          "rating": 4.5,
-          "location": "Actual location description",
-          "amenities": ["Actual amenities offered"],
-          "bookingUrl": "Official hotel website or booking.com/makemytrip link"
+          "name": "Real hotel name near ${destination} that actually exists",
+          "type": "Hotel (with star rating if applicable)",
+          "price": "Realistic price per night in Indian Rupees (₹) with room type specified",
+          "rating": "Actual rating between 1.0-5.0 based on real reviews",
+          "location": "Specific neighborhood, proximity to landmarks or center",
+          "amenities": ["List 4-6 actual amenities offered like 'Free Wi-Fi', 'Swimming Pool', 'Restaurant', 'Airport Shuttle'"],
+          "bookingUrl": "Official hotel website or specific booking.com/makemytrip/goibibo link"
         }
       ],
       "apartments": [
         {
-          "name": "Real apartment/homestay name near ${destination}",
-          "type": "Apartment",
-          "price": "Realistic price per night in Indian Rupees (₹)",
-          "rating": 4.2,
-          "location": "Actual location description",
-          "amenities": ["Actual amenities offered"],
-          "bookingUrl": "Official booking website"
+          "name": "Real apartment/homestay/guesthouse name near ${destination} that actually exists",
+          "type": "Apartment/Homestay/Guesthouse",
+          "price": "Realistic price per night in Indian Rupees (₹) with occupancy details",
+          "rating": "Actual rating between 1.0-5.0 based on real reviews",
+          "location": "Specific neighborhood, proximity to landmarks or center",
+          "amenities": ["List 4-6 actual amenities offered like 'Kitchen', 'Washing Machine', 'Private Balcony', 'Self Check-in'"],
+          "bookingUrl": "Official booking website or Airbnb/VRBO link"
         }
       ],
       "hostels": [
         {
-          "name": "Real hostel/budget accommodation near ${destination}",
-          "type": "Hostel",
-          "price": "Realistic price per night in Indian Rupees (₹)",
-          "rating": 3.8,
-          "location": "Actual location description",
-          "amenities": ["Actual amenities offered"],
-          "bookingUrl": "Official booking website"
+          "name": "Real hostel/budget accommodation near ${destination} that actually exists",
+          "type": "Hostel/Dormitory/Budget Hotel",
+          "price": "Realistic price per night in Indian Rupees (₹) with bed type specified (dorm/private)",
+          "rating": "Actual rating between 1.0-5.0 based on real reviews",
+          "location": "Specific neighborhood, proximity to landmarks or center", 
+          "amenities": ["List 4-6 actual amenities offered like 'Free Breakfast', 'Locker Storage', 'Common Kitchen', 'Laundry Facilities'"],
+          "bookingUrl": "Official booking website or Hostelworld link"
         }
       ]
     },
     "attractions": [
       {
-        "name": "Major attraction in/near ${destination}",
-        "type": "Type (e.g., Historical Site, Museum, Natural Wonder)",
-        "description": "Detailed description with historical/cultural context",
-        "rating": 4.7,
-        "price": "Entrance fee in Rupees or 'Free'",
-        "location": "Precise location",
-        "openingHours": "Actual opening hours",
+        "name": "Specific major attraction in/near ${destination}",
+        "type": "Specific type (e.g., Historical Site, Museum, Natural Wonder, Religious Site)",
+        "description": "Detailed description with historical/cultural context, what to expect, and why it's significant",
+        "rating": "Actual rating between 1.0-5.0 based on visitor reviews",
+        "price": "Current entrance fee in Rupees with concession details or 'Free'",
+        "location": "Precise location with neighborhood/area",
+        "openingHours": "Actual up-to-date opening hours with day-specific variations if applicable",
         "ticketUrl": "Official ticket booking website if available"
       }
     ],
     "localArtifacts": [
       {
-        "name": "Famous local artifact or sweet from ${destination} region",
-        "description": "Detailed description of this artifact or sweet, including its historical significance, cultural importance",
+        "name": "Specific authentic local artifact or sweet from ${destination} region, not generic items",
+        "description": "Detailed description including materials, production techniques, historical significance, cultural importance, and unique characteristics that differentiate it from similar items in other regions",
         "shops": [
           {
-            "name": "Actual shop name where tourists can buy it",
-            "address": "Actual shop location",
-            "contact": "Contact number if known, otherwise N/A"
+            "name": "Actual named shop that verifiably sells this item (preferably specializing in it)",
+            "address": "Specific address or landmark-based location that would allow a visitor to find it",
+            "contact": "Current contact number or 'N/A' if not publicly available"
           }
         ]
       }
     ],
     "localArtists": [
       {
-        "name": "Notable local artist name",
-        "specialty": "Their specific art form",
-        "location": "Where to find them or their work",
-        "contact": "Public contact information if available, otherwise N/A",
-        "description": "Description of their work and significance"
+        "name": "Named local artist or artisan collective that visitors can actually find",
+        "specialty": "Specific traditional or contemporary art form practiced (e.g., 'Madhubani Painting', 'Bidri Metalwork', 'Bronze Sculpture')",
+        "location": "Specific studio, workshop, gallery address, or market stall location where visitors can meet them or see their work",
+        "contact": "Public contact information (phone, social media handle) or 'N/A' if unavailable",
+        "description": "Description of their distinctive style, techniques, materials, recognition (awards/exhibits), and whether they offer demonstrations or workshops for visitors"
       }
     ],
     "nearbyEducationalSites": [
       {
-        "name": "Educational institution or site near ${destination}",
-        "type": "University/Museum/Library/Research Center",
-        "description": "Description of educational significance",
-        "visitorInfo": "Visitor information (if open to public)",
-        "address": "Actual address",
-        "website": "Official website URL"
+        "name": "Specific educational institution or knowledge-focused site near ${destination}",
+        "type": "University/Museum/Library/Research Center/Historical Archive/Science Center",
+        "description": "Detailed description focused on educational value, special collections, historical significance, research opportunities, and distinctive architectural features",
+        "visitorInfo": "Specific visitor information including guided tour availability, whether prior registration is needed, access to facilities, and special events",
+        "address": "Complete physical address",
+        "website": "Current official website URL"
       }
     ]
   }
   
-  Please research and provide the following with ENHANCED ACCURACY:
-  1. VERIFIED transportation providers that actually serve ${destination} - use real airlines, train services, bus companies with their correct names and routes
-  2. CONFIRMED accommodation options near ${destination} - use real hotel/hostel names, with accurate locations and current price ranges
-  3. FACTUAL attractions and landmarks with precise descriptions, actual opening hours, and current entrance fees
-  4. AUTHENTIC local artifacts, crafts, and food items that are genuinely specific to ${destination} region (not generic items)
-  5. GENUINE information about local artists in ${destination}, especially those who have workshops or galleries open to visitors
-  6. ACCURATE educational and historical sites with correct visitor information and websites
-
+  Please research and provide the following with MAXIMUM ACCURACY:
+  1. VERIFIED transportation providers that actually serve ${destination} - use real airlines, train services, bus companies with their correct names, routes, and current schedules. If limited or no options exist for a category, return an empty array rather than fabricating connections.
+  
+  2. CONFIRMED accommodation options near ${destination} - use real hotel/hostel/apartment names that actually exist in the location, with accurate locations, realistic price ranges (in ₹), and verified amenities.
+  
+  3. FACTUAL attractions and landmarks with precise descriptions, actual opening hours, and current entrance fees. Focus on attractions that are significant to the destination's identity or culture.
+  
+  4. AUTHENTIC local artifacts, crafts, and sweet treats that are SPECIFICALLY associated with ${destination} region, not generic items found throughout the country. Include:
+     - Traditional manufacturing processes
+     - Materials unique to the region
+     - Cultural or religious significance
+     - Distinctive regional designs or flavors
+     - Shops where these items are genuinely available (with current contacts)
+  
+  5. GENUINE information about local artists in ${destination}, focusing on:
+     - Artists/artisans with established workshops or galleries
+     - Traditional craftspeoplE preserving cultural heritage
+     - Well-known local experts in their field
+     - Whether they offer demonstrations or workshops for visitors
+     - Accurate locations where visitors can see their work or meet them
+  
+  6. ACCURATE educational and historical sites with correct visitor information including:
+     - Academic facilities open to visitors
+     - Research institutions with public programs
+     - Knowledge-focused attractions (science centers, historical archives)
+     - Libraries or museums with special collections
+     - Campus tour availability and educational programs
+     - Whether appointments/prior registration is required
+  
   Special instructions:
   - For remote or less-visited destinations, return smaller arrays with only verified options rather than fabricating entities
   - If ${destination} is a smaller location, include travel options to/from the nearest major transportation hub
   - For educational institutions like universities, provide specific visitor information including campus tour details
   - Include realistic price ranges that reflect the current market rates (as of 2024-2025)
   - For attractions, prioritize those with cultural, historical, or educational significance
+  - DO NOT generate fictitious business names or generic descriptions
+  - If specific authenticated information is limited for any category, it is better to provide fewer accurate entries than many fictional ones
   
-  If ${destination} is an educational institution (like Nalanda University, IIT, etc.), provide specific details about:
-  - Campus accessibility by various transport modes with accurate routes
-  - Accommodations suitable for academic visitors near the campus
-  - Educational value, historical significance, and special collections/facilities
-  - Nearby attractions relevant to academic visitors and researchers
-  - Guided tour availability and educational programs for visitors
-
-  Include 3-5 items for each category with realistic details that would be useful to someone planning a trip to ${destination}.
+  Return EXACTLY 3-5 items for transportation options, lodging, and attractions categories.
+  Return EXACTLY 2-3 items for local artifacts, local artists, and educational sites categories.
   
   Return ONLY the JSON object with no additional text.
   `;
